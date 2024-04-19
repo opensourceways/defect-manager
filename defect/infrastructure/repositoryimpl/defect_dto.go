@@ -47,8 +47,8 @@ func (impl defectImpl) toDefectDO(defect *domain.Defect) defectDO {
 		ComponentVersion: defect.ComponentVersion,
 		SystemVersion:    defect.SystemVersion.String(),
 		Description:      defect.Description,
-		ReferenceURL:     defect.ReferenceURL.URL(),
-		GuidanceURL:      defect.GuidanceURL.URL(),
+		ReferenceURL:     "",
+		GuidanceURL:      "",
 		Influence:        defect.Influence,
 		SeverityLevel:    defect.SeverityLevel.String(),
 		AffectedVersion:  toStringArray(defect.AffectedVersion),
@@ -77,8 +77,6 @@ func toSystemVersion(arr pq.StringArray) []dp.SystemVersion {
 
 func (d defectDO) toDefect() domain.Defect {
 	version, _ := dp.NewSystemVersion(d.SystemVersion)
-	referenceURL, _ := dp.NewURL(d.ReferenceURL)
-	guidanceURL, _ := dp.NewURL(d.GuidanceURL)
 	severityLevel, _ := dp.NewSeverityLevel(d.SeverityLevel)
 	status, _ := dp.NewIssueStatus(d.Status)
 
@@ -88,8 +86,8 @@ func (d defectDO) toDefect() domain.Defect {
 		ComponentVersion: d.ComponentVersion,
 		SystemVersion:    version,
 		Description:      d.Description,
-		ReferenceURL:     referenceURL,
-		GuidanceURL:      guidanceURL,
+		ReferenceURL:     nil,
+		GuidanceURL:      nil,
 		Influence:        d.Influence,
 		SeverityLevel:    severityLevel,
 		AffectedVersion:  toSystemVersion(d.AffectedVersion),

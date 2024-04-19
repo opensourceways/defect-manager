@@ -122,7 +122,7 @@ func (impl bulletinImpl) documentNotes(sb *domain.SecurityBulletin) DocumentNote
 				Type:    "General",
 				Ordinal: "2",
 				XmlLang: "en",
-				Note:    fmt.Sprintf("openEuler Bugfix Update for %s", impl.joinVersion(sb)),
+				Note:    fmt.Sprintf("An update for %s is now available for %s", sb.Component, impl.joinVersion(sb)),
 			},
 			{
 				Title:   "Description",

@@ -31,3 +31,7 @@ func Date() string {
 func Year() int {
 	return time.Now().Year()
 }
+
+func FormatTime(t time.Time) string {
+	return t.Format("2006-01-02T15:04:05")
+}

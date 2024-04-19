@@ -7,8 +7,8 @@ import (
 func TestAssigner(t *testing.T) {
 	InitCommitterInstance()
 
-	committerInstance.initCommitterCache()
-	b := committerInstance.isCommitter("src-openeuler/A-Ops", "luanjianhai")
+	CommitterInstance.InitCommitterCache()
+	b := CommitterInstance.isCommitter("src-openeuler/A-Ops", "luanjianhai")
 	if !b {
 		t.Failed()
 	}

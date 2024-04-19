@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-var committerInstance *committerCache
+var CommitterInstance *committerCache
 
 type ResContent struct {
 	Type string `json:"type"`
@@ -34,14 +34,27 @@ type committerCache struct {
 }
 
 func InitCommitterInstance() {
-	committerInstance = &committerCache{
+	CommitterInstance = &committerCache{
 		committersOfRepo: make(map[string][]string),
 	}
 }
 
+func (c *committerCache) listCommitter(pathWithNamespace string) []string {
+	if len(c.committersOfRepo) == 0 || c.CacheAt != time.Now().Format("20060102") {
+		c.InitCommitterCache()
+	}
+
+	v, ok := c.committersOfRepo[pathWithNamespace]
+	if !ok {
+		return []string{}
+	}
+
+	return v
+}
+
 func (c *committerCache) isCommitter(pathWithNamespace, user string) bool {
 	if len(c.committersOfRepo) == 0 || c.CacheAt != time.Now().Format("20060102") {
-		c.initCommitterCache()
+		c.InitCommitterCache()
 	}
 
 	v, ok := c.committersOfRepo[pathWithNamespace]
@@ -54,9 +67,10 @@ func (c *committerCache) isCommitter(pathWithNamespace, user string) bool {
 	return set.Has(user)
 }
 
-func (c *committerCache) initCommitterCache() {
+func (c *committerCache) InitCommitterCache() {
 	cli := utils.NewHttpClient(3)
-	for _, sig := range c.getSig() {
+	sigs := c.getSig()
+	for _, sig := range sigs {
 		// Accessing too often can cause 503 errors
 		time.Sleep(time.Millisecond * 200)
 
@@ -88,7 +102,7 @@ func (c *committerCache) initCommitterCache() {
 }
 
 func (c *committerCache) getSig() []string {
-	url := "https://gitee.com/api/v5/repos/openeuler/community/contents/sig"
+	url := "https://gitee.com/api/v5/repos/openeuler/community/contents/sig?access_token"
 	request, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		logrus.Errorf("new request of sig url error: %s ", err.Error())

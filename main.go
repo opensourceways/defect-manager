@@ -140,6 +140,21 @@ func run(cfg *config.Config, o options) {
 		return
 	}
 
+	//issue.CommitterInstance.InitCommitterCache()
+	/* 	go func() {
+		issue.CommitterInstance.InitCommitterCache()
+
+		ticker := time.NewTicker(issue.TickerInterval * time.Hour)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				issue.CommitterInstance.InitCommitterCache()
+			}
+		}
+	}() */
+
 	// run http server
 	server2.StartWebServer(o.service.Port, o.service.GracePeriod, func(engine *gin.Engine) {
 		docs.SwaggerInfo.BasePath = "/api"
