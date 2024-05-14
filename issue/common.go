@@ -14,9 +14,9 @@ const feedback = `
 
 缺陷严重等级:(Critical/High/Moderate/Low)
 
-受影响版本排查(受影响/不受影响)：
+受影响版本排查(受影响/不受影响):
 %v
-修复是否涉及abi变化(是/否)：
+修复是否涉及abi变化(是/否):
 %v
 `
 
@@ -25,9 +25,9 @@ const commentFeedback = `
 %v
 缺陷严重等级:(Critical/High/Moderate/Low)
 %v
-受影响版本排查(受影响/不受影响)：
+受影响版本排查(受影响/不受影响):
 %v
-修复是否涉及abi变化(是/否)：
+修复是否涉及abi变化(是/否):
 %v
 `
 
@@ -49,6 +49,11 @@ const commentCopyValue = `
 **1. 当前issue受影响的分支提交pr时, 须在pr描述中填写当前issue编号进行关联, 否则无法关闭当前issue;**
 **2. 模板内容需要填写完整, 无论是受影响或者不受影响都需要填写完整内容,未引入的分支不需要填写, 否则无法关闭当前issue;**
 **3. 以下为模板中需要填写完整的内容, 请复制到评论区回复, 注: 内容的标题名称(影响性分析说明, 缺陷严重等级, 受影响版本排查(受影响/不受影响), 修复是否涉及abi变化(是/否))不能省略,省略后defect-manager将无法正常解析填写内容.**
+**评论区使用指令说明:**
+| 指令  | 指令说明 | 使用权限 |
+|:--:|:--:|---------|
+|/check-issue|校验issue格式|不限|
+|/reason xxx|/reason +挂起或拒绝条件|不限|
 ************************************************************************
 影响性分析说明: 
 
@@ -56,7 +61,7 @@ const commentCopyValue = `
 
 受影响版本排查(受影响/不受影响): 
 %v
-abi变化(是/否)：
+abi变化(是/否):
 %v
 -----------------------------------------------------------------------
 issue处理具体操作请参考: 
@@ -71,11 +76,11 @@ const rejectTb = `
 `
 
 const rejectComment = `
-%v 当前issue状态为: 已挂起,请先修改issue状态, 否则评论无法被识别.
+%v 当前issue状态为: %v,请先修改issue状态, 否则评论无法被识别.
 `
 
 const tb = `
-%v 经过defect-manager解析，已分析的内容如下表所示：
+%v 经过defect-manager解析，已分析的内容如下表所示:
 		| 状态  | 需分析 | 内容 |
 |:--:|:--:|---------|
 |已分析|1.影响性分析说明|%v|
@@ -91,8 +96,13 @@ const reOpenComment = `
 具体操作参考: %v
 `
 
+const commentVersionTip = `
+%v 请确认分支: %v.
+**请确认分支信息是否填写完整，否则将无法关闭当前issue.**
+`
+
 const (
-	commentCmd  = "https://gitee.com/openeuler/cve-manager/blob/master/cve-vulner-manager/doc/md/manual.md"
+	commentCmd  = "https://gitee.com/Coopermassaki/cve-manager/blob/master/cve-vulner-manager/doc/md/defect-manager-manual.md"
 	PrIssueLink = "https://gitee.com/help/articles/4142"
 )
 
@@ -123,7 +133,7 @@ func commentTemplate(maintainVersion, committerList []string) string {
 
 	var affectedVersion string
 	for i, version := range maintainVersion {
-		affectedVersion += fmt.Sprintf("%d. %s\n", i+1, version)
+		affectedVersion += fmt.Sprintf("%d. %s:\n", i+1, version)
 	}
 
 	assList := []string{}

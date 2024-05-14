@@ -1,9 +1,11 @@
 package issue
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/opensourceways/defect-manager/defect/app"
 	"github.com/opensourceways/defect-manager/defect/domain"
 	"github.com/opensourceways/defect-manager/defect/domain/dp"
+	defectUtils "github.com/opensourceways/defect-manager/utils"
 )
 
 var Instance *eventHandler
@@ -67,14 +70,8 @@ func (impl eventHandler) HandleIssueEvent(e *sdk.IssueEvent) error {
 		return nil
 	}
 
-	mts, err := impl.listMilestones(e)
-	if err != nil {
-		logrus.Errorf("list milestones: %v, error: %s", mts, err.Error())
-		return nil
-	}
-
-	for _, v := range mts {
-		if strings.Contains(e.Issue.Body, v.Title) {
+	for _, v := range impl.cfg.DevelopVersion {
+		if strings.Contains(e.Issue.Body, v) {
 			return nil
 		}
 	}
@@ -122,7 +119,7 @@ func (impl eventHandler) handleIssueReject(e *sdk.IssueEvent) error {
 				return err
 			}
 
-			str2 := fmt.Sprintf(rejectComment, "@"+e.Assignee.UserName)
+			str2 := fmt.Sprintf(rejectComment, "@"+e.Assignee.UserName, e.Issue.StateName)
 			return commentIssue(str2)
 		}
 	}
@@ -143,7 +140,7 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 		)
 	}
 
-	issueInfo, err := impl.parseIssue(e.Issue.Body)
+	issueInfo, err := impl.parseIssue(e.Issue.Assignee, e.Issue.Body)
 	if err != nil {
 		return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
 	}
@@ -159,7 +156,7 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 		return commentIssue("未对受影响版本排查/abi变化进行分析，重新打开issue")
 	}
 
-	commentInfo, err := impl.parseComment(comment)
+	commentInfo, err := impl.parseComment(e.Issue.Assignee, comment)
 	if err != nil {
 		return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
 	}
@@ -215,6 +212,10 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 }
 
 func (impl eventHandler) handleIssueOpen(e *sdk.IssueEvent) error {
+	if *e.Action == "assign" {
+		return nil
+	}
+
 	cp := checkIssueParam{
 		namespace:     e.Project.Namespace,
 		name:          e.Project.Name,
@@ -222,6 +223,7 @@ func (impl eventHandler) handleIssueOpen(e *sdk.IssueEvent) error {
 		issueNumber:   e.Issue.Number,
 		issueId:       e.Issue.Id,
 		issueCreateAt: e.Issue.CreatedAt,
+		issueUser:     e.User,
 		issueAssigner: e.Assignee,
 	}
 
@@ -231,7 +233,8 @@ func (impl eventHandler) handleIssueOpen(e *sdk.IssueEvent) error {
 // || e.Comment.User.Login == impl.botName
 func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
 	if !e.IsIssue() || e.Issue.TypeName != impl.cfg.IssueType ||
-		e.Issue.State == sdk.StatusClosed || e.Comment.User.Login == impl.botName {
+		e.Issue.StateName == StatusFinished || e.Issue.StateName == StatusCancel ||
+		e.Issue.StateName == StatusSuspend || e.Comment.User.Login == impl.botName {
 		return nil
 	}
 	commentIssue := func(content string) error {
@@ -248,6 +251,7 @@ func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
 			issueNumber:   e.Issue.Number,
 			issueId:       e.Issue.Id,
 			issueCreateAt: e.Issue.CreatedAt,
+			issueUser:     e.Issue.User,
 			issueAssigner: e.Issue.Assignee,
 		}
 
@@ -255,12 +259,12 @@ func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
 	}
 
 	if strings.Contains(e.Comment.Body, influence) {
-		issueInfo, err := impl.parseIssue(e.Issue.Body)
+		issueInfo, err := impl.parseIssue(e.Issue.Assignee, e.Issue.Body)
 		if err != nil {
 			return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
 		}
 
-		commentInfo, err := impl.parseComment(e.Comment.Body)
+		commentInfo, err := impl.parseComment(e.Comment.User, e.Comment.Body)
 		if err != nil {
 			return commentIssue(err.Error())
 		}
@@ -427,12 +431,13 @@ type checkIssueParam struct {
 	issueNumber   string
 	issueId       int32
 	issueCreateAt time.Time
+	issueUser     *sdk.UserHook
 	issueAssigner *sdk.UserHook
 }
 
 func (impl eventHandler) checkIssue(cp checkIssueParam) error {
 	if cp.issueAssigner == nil {
-		err := impl.setIssueAssignee(cp.namespace, cp.issueNumber)
+		err := impl.setIssueAssignee(cp.namespace, cp.name, cp.issueNumber)
 		if err != nil {
 			logrus.Errorf("set issue assignee error: %s", err.Error())
 		}
@@ -450,7 +455,7 @@ func (impl eventHandler) checkIssue(cp checkIssueParam) error {
 		return fmt.Errorf("deal issue error: %s", err.Error())
 	}
 
-	if _, err := impl.parseIssue(newbody); err != nil {
+	if _, err := impl.parseIssue(cp.issueUser, newbody); err != nil {
 		return impl.cli.CreateIssueComment(cp.namespace,
 			cp.name, cp.issueNumber, strings.Replace(err.Error(), ". ", "\n\n", -1),
 		)
@@ -462,15 +467,14 @@ func (impl eventHandler) checkIssue(cp checkIssueParam) error {
 		return fmt.Errorf("update issue error: %s", err.Error())
 	}
 
-	return nil
-	/* 	dl := deadLineParam{
-	   		name:         cp.name,
-	   		enterpriseId: impl.cfg.EnterpriseId,
-	   		issueId:      cp.issueId,
-	   		issueCreatAt: cp.issueCreateAt,
-	   	}
+	dl := deadLineParam{
+		name:         cp.name,
+		enterpriseId: impl.cfg.EnterpriseId,
+		issueId:      cp.issueId,
+		issueCreatAt: cp.issueCreateAt,
+	}
 
-	   	return impl.updateIssueDeadline(dl) */
+	return impl.updateIssueDeadline(dl)
 }
 
 type dealIssueParam struct {
@@ -518,7 +522,7 @@ func (impl eventHandler) dealIssue(dp dealIssueParam) (string, error) {
 	return newbody, impl.cli.CreateIssueComment(dp.namespace, dp.name, dp.issueNumber, firstComment)
 }
 
-/* type deadLineParam struct {
+type deadLineParam struct {
 	name         string
 	enterpriseId string
 	issueId      int32
@@ -572,15 +576,17 @@ func (impl eventHandler) setDeadline(name string, createAt time.Time) IssueParam
 		PlanStartedAt: startAt,
 		Deadline:      dl,
 	}
-} */
+}
 
-func (impl eventHandler) setIssueAssignee(namespace, number string) error {
-	assigner := CommitterInstance.getAssigner(namespace)
+func (impl eventHandler) setIssueAssignee(namespace, repo, number string) error {
+	pathWithNamespace := strings.Join([]string{namespace, repo}, "/")
+	logrus.Infof("pathWithNamespace: %s", pathWithNamespace)
+	assigner := CommitterInstance.getAssigner(pathWithNamespace)
 	if assigner == "" {
 		return fmt.Errorf("%s get assigner error", namespace)
 	}
 
-	if _, err := impl.cli.UpdateIssue(namespace, number, sdk.IssueUpdateParam{Assignee: assigner}); err != nil {
+	if _, err := impl.cli.UpdateIssue(namespace, number, sdk.IssueUpdateParam{Assignee: assigner, Repo: repo}); err != nil {
 		return err
 	}
 

@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	sdk "github.com/opensourceways/go-gitee/gitee"
 	"github.com/opensourceways/server-common-lib/utils"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -73,7 +74,7 @@ var (
 		itemTitleProblemReproductionSteps: "问题复现步骤",
 		itemReferenceAndGuidanceUrl:       "详情及分析指导参考链接",
 		itemInfluence:                     "影响性分析说明",
-		itemSeverityLevel:                 "严重等级",
+		itemSeverityLevel:                 "缺陷严重等级",
 		itemAffectedVersion:               "受影响版本",
 		itemAbi:                           "abi",
 	}
@@ -148,13 +149,13 @@ type parseCommentResult struct {
 	Abi              []string
 }
 
-func (impl eventHandler) parseIssue(body string) (parseIssueResult, error) {
+func (impl eventHandler) parseIssue(assigner *sdk.UserHook, body string) (parseIssueResult, error) {
 	var parseIssueParam = sortOfIssueItems
 	if strings.Contains(body, "###") {
 		parseIssueParam = sortOfIssueTitleItems
 	}
 
-	result, err := impl.parse(parseIssueParam, body)
+	result, err := impl.parse(parseIssueParam, assigner, body)
 	if err != nil {
 		return parseIssueResult{}, err
 	}
@@ -182,8 +183,8 @@ func (impl eventHandler) parseIssue(body string) (parseIssueResult, error) {
 	return ret, nil
 }
 
-func (impl eventHandler) parseComment(body string) (parseCommentResult, error) {
-	result, err := impl.parse(sortOfCommentItems, body)
+func (impl eventHandler) parseComment(assigner *sdk.UserHook, body string) (parseCommentResult, error) {
+	result, err := impl.parse(sortOfCommentItems, assigner, body)
 	if err != nil {
 		return parseCommentResult{}, err
 	}
@@ -198,7 +199,7 @@ func (impl eventHandler) parseComment(body string) (parseCommentResult, error) {
 	}
 
 	if v, ok := result[itemAffectedVersion]; ok {
-		allVersionResult, verison, err := impl.parseVersion(v)
+		allVersionResult, verison, err := impl.parseVersion(v, assigner)
 		if err != nil {
 			return parseCommentResult{}, err
 		}
@@ -208,7 +209,7 @@ func (impl eventHandler) parseComment(body string) (parseCommentResult, error) {
 	}
 
 	if v, ok := result[itemAbi]; ok {
-		AllAbiResult, abi, err := impl.parseVersion(v)
+		AllAbiResult, abi, err := impl.parseVersion(v, assigner)
 		if err != nil {
 			return parseCommentResult{}, err
 		}
@@ -220,17 +221,22 @@ func (impl eventHandler) parseComment(body string) (parseCommentResult, error) {
 	return ret, nil
 }
 
-func (impl eventHandler) parse(items []string, body string) (map[string]string, error) {
+func (impl eventHandler) parse(items []string, assigner *sdk.UserHook, body string) (map[string]string, error) {
+	var assign string
+	if assigner != nil {
+		assign = "@" + assigner.Name
+	}
+
 	mr := utils.NewMultiErrors()
-	genErr := func(item, value string) string {
-		return fmt.Sprintf("%s %s 错误", item, value)
+	genErr := func(item string) string {
+		return fmt.Sprintf("%s %s=> 没有按正确格式填写", assign, item)
 	}
 
 	parseResult := make(map[string]string)
 	for _, item := range items {
 		match := regexpOfItems[item].FindAllStringSubmatch(body, -1)
 		if len(match) < 1 || len(match[regMatchResult]) < 3 {
-			mr.Add(fmt.Sprintf("%s 解析失败", itemName[item]))
+			mr.Add(fmt.Sprintf("%s %s=> 没有按正确格式填写", assign, itemName[item]))
 			continue
 		}
 
@@ -250,17 +256,17 @@ func (impl eventHandler) parse(items []string, body string) (map[string]string, 
 		switch item {
 		case itemSeverityLevel:
 			if _, exist := severityLevelMap[parseResult[item]]; !exist {
-				mr.Add(genErr(itemName[itemSeverityLevel], parseResult[item]))
+				mr.Add(genErr(itemName[itemSeverityLevel]))
 			}
 		case itemOS:
 			maintainVersion := sets.NewString(impl.cfg.MaintainVersion...)
 			if !maintainVersion.Has(parseResult[item]) {
-				mr.Add(genErr(itemName[itemOS], parseResult[item]))
+				mr.Add(genErr(itemName[itemOS]))
 			}
 		case itemComponents:
 			split := strings.Split(parseResult[item], "-")
 			if len(split) < 2 {
-				mr.Add(genErr(itemName[itemComponents], parseResult[item]))
+				mr.Add(genErr(itemName[itemComponents]))
 			}
 		}
 	}
@@ -268,11 +274,16 @@ func (impl eventHandler) parse(items []string, body string) (map[string]string, 
 	return parseResult, mr.Err()
 }
 
-func (impl eventHandler) parseVersion(s string) (versionAnalysisResult, affectedVersion []string, err error) {
+func (impl eventHandler) parseVersion(s string, assigner *sdk.UserHook) (versionAnalysisResult, affectedVersion []string, err error) {
+	var assign string
+	if assigner != nil {
+		assign = "@" + assigner.Name
+	}
+
 	reg := regexp.MustCompile(`(openEuler.*?)[:：]\s*([受影响|不受影响|是|否]+)`)
 	matches := reg.FindAllStringSubmatch(s, -1)
 	if len(matches) == 0 {
-		return nil, nil, fmt.Errorf("请对受影响版本排查/abi变化进行分析")
+		return nil, nil, fmt.Errorf(fmt.Sprintf("@%s 请对受影响版本排查/abi变化进行分析", assigner.Name))
 	}
 
 	var allVersion []string
@@ -288,12 +299,32 @@ func (impl eventHandler) parseVersion(s string) (versionAnalysisResult, affected
 		}
 	}
 
+	reg2 := regexp.MustCompile("受影响(.+)$")
+	for i, v := range allVersion {
+		if strings.Contains(v, "受影响") {
+			matches := reg2.FindAllStringSubmatch(v, -1)
+
+			if len(matches) > 0 {
+				lastMatch := matches[len(matches)-1]
+				allVersion[i] = lastMatch[1]
+			}
+		}
+	}
+
 	av := sets.NewString(allVersion...)
 
-	if !av.HasAll(impl.cfg.MaintainVersion...) {
-		return nil, nil, fmt.Errorf("受影响版本排查/abi变化与当前维护版本不一致，当前维护版本:\n%s",
-			strings.Join(impl.cfg.MaintainVersion, "\n"),
-		)
+	var missingVersions []string
+
+	for _, version := range impl.cfg.MaintainVersion {
+		if !av.Has(version) {
+			missingVersions = append(missingVersions, version)
+		}
+	}
+
+	missingVersionsString := strings.Join(missingVersions, ",")
+
+	if len(missingVersions) > 0 {
+		return nil, nil, fmt.Errorf(fmt.Sprintf(commentVersionTip, assign, missingVersionsString))
 	}
 
 	return versionAnalysisResult, affectedVersion, nil

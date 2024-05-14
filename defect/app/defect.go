@@ -88,6 +88,11 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 		}
 	}
 
+	logrus.Infof("versionForDefects : %s", versionForDefects)
+
+	d.productTree.InitCache()
+	defer d.productTree.CleanCache()
+
 	var rpmForDefects domain.Defects
 	instance := producttreeimpl.Instance()
 	for _, vdf := range versionForDefects {
@@ -96,6 +101,8 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 			rpmForDefects = append(rpmForDefects, vdf)
 		}
 	}
+
+	logrus.Infof("rpmForDefects : %s", rpmForDefects)
 
 	publishedNum, err := d.backend.PublishedDefects()
 	if err != nil {
@@ -110,6 +117,7 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 		}
 	}
 
+	logrus.Infof("unpublishedDefects : %s", unpublishedDefects)
 	dto = ToCollectDefectsDTO(unpublishedDefects)
 
 	return

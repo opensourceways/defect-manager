@@ -85,6 +85,8 @@ func (impl *productTreeImpl) ParseRPM(defectTime time.Time, component, version s
 	// content of buf, example:
 	// https://gitee.com/openeuler_latest_rpms/obs_pkg_rpms_20230517/raw/master/latest_rpm/openEuler-22.03-LTS.csv
 	buf := bytes.NewBuffer(impl.rpmCache[version])
+	layout := "20060102 15-04-05"
+	targetLayout := "2006-01-02 15:04:05"
 
 	var rpmOfComponent string
 	for {
@@ -103,13 +105,21 @@ func (impl *productTreeImpl) ParseRPM(defectTime time.Time, component, version s
 		}
 
 		if split[1] == component {
-			parsedTime, err := time.Parse("2006-01-02 15:04:05", split[0])
+			parsedTime, err := time.Parse(layout, split[0])
 			if err != nil {
 				logrus.Errorf("parse time error %s", err.Error())
 				break
 			}
 
-			if parsedTime.After(defectTime) {
+			formattedTime := parsedTime.Format(targetLayout)
+
+			targetParsedTime, err := time.Parse(targetLayout, formattedTime)
+			if err != nil {
+				logrus.Errorf("parse targetParsedTime error %s", err.Error())
+				break
+			}
+
+			if targetParsedTime.After(defectTime) {
 				rpmOfComponent = split[2]
 				break
 			}

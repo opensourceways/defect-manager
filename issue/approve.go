@@ -31,7 +31,8 @@ type ResCommitter struct {
 type committerCache struct {
 	committersOfRepo map[string][]string
 	assignerOfRepo   map[string]string
-	CacheAt          string
+	//EnterpriseId     int32
+	CacheAt string
 }
 
 func InitCommitterInstance() {
