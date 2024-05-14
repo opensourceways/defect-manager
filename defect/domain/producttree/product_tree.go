@@ -1,6 +1,8 @@
 package producttree
 
 import (
+	"time"
+
 	"github.com/opensourceways/defect-manager/defect/domain"
 	"github.com/opensourceways/defect-manager/defect/domain/dp"
 )
@@ -8,5 +10,5 @@ import (
 type ProductTree interface {
 	InitCache()
 	CleanCache()
-	GetTree(component string, version []dp.SystemVersion) (domain.ProductTree, error)
+	GetTree(defectTime time.Time, component string, version []dp.SystemVersion) (domain.ProductTree, error)
 }

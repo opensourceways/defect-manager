@@ -99,5 +99,7 @@ func (d defectDO) toDefect() domain.Defect {
 			Repo:   d.Repo,
 			Status: status,
 		},
+		CreatedAt: d.CreatedAt,
+		UpdatedAt: d.UpdatedAt,
 	}
 }

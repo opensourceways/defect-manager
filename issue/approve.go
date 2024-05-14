@@ -30,20 +30,18 @@ type ResCommitter struct {
 
 type committerCache struct {
 	committersOfRepo map[string][]string
+	assignerOfRepo   map[string]string
 	CacheAt          string
 }
 
 func InitCommitterInstance() {
 	CommitterInstance = &committerCache{
 		committersOfRepo: make(map[string][]string),
+		assignerOfRepo:   make(map[string]string),
 	}
 }
 
 func (c *committerCache) listCommitter(pathWithNamespace string) []string {
-	if len(c.committersOfRepo) == 0 || c.CacheAt != time.Now().Format("20060102") {
-		c.InitCommitterCache()
-	}
-
 	v, ok := c.committersOfRepo[pathWithNamespace]
 	if !ok {
 		return []string{}
@@ -52,11 +50,16 @@ func (c *committerCache) listCommitter(pathWithNamespace string) []string {
 	return v
 }
 
-func (c *committerCache) isCommitter(pathWithNamespace, user string) bool {
-	if len(c.committersOfRepo) == 0 || c.CacheAt != time.Now().Format("20060102") {
-		c.InitCommitterCache()
+func (c *committerCache) getAssigner(pathWithNamespace string) string {
+	v, ok := c.assignerOfRepo[pathWithNamespace]
+	if !ok {
+		return ""
 	}
 
+	return v
+}
+
+func (c *committerCache) isCommitter(pathWithNamespace, user string) bool {
 	v, ok := c.committersOfRepo[pathWithNamespace]
 	if !ok {
 		return false
@@ -93,9 +96,24 @@ func (c *committerCache) InitCommitterCache() {
 			continue
 		}
 
+		var sigAssigner string
+		if len(res.Data.Maintainers) > 0 {
+			sigAssigner = res.Data.Maintainers[0]
+		}
+
 		for _, v := range res.Data.CommitterDetails {
 			c.committersOfRepo[v.Repo] = append(res.Data.Maintainers, v.GiteeId...)
+
+			var assigner string
+			if len(v.GiteeId) > 0 {
+				assigner = v.GiteeId[0]
+			} else {
+				assigner = sigAssigner
+			}
+
+			c.assignerOfRepo[v.Repo] = assigner
 		}
+
 	}
 
 	c.CacheAt = time.Now().Format("20060102")

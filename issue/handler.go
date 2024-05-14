@@ -222,6 +222,7 @@ func (impl eventHandler) handleIssueOpen(e *sdk.IssueEvent) error {
 		issueNumber:   e.Issue.Number,
 		issueId:       e.Issue.Id,
 		issueCreateAt: e.Issue.CreatedAt,
+		issueAssigner: e.Assignee,
 	}
 
 	return impl.checkIssue(cp)
@@ -247,6 +248,7 @@ func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
 			issueNumber:   e.Issue.Number,
 			issueId:       e.Issue.Id,
 			issueCreateAt: e.Issue.CreatedAt,
+			issueAssigner: e.Issue.Assignee,
 		}
 
 		return impl.checkIssue(cp)
@@ -333,7 +335,7 @@ func (impl eventHandler) toCmd(title, number, namespace, name string, issue pars
 
 	return app.CmdToSaveDefect{
 		Kernel:           issue.Kernel,
-		Component:        issue.Component,
+		Component:        name,
 		ComponentVersion: issue.ComponentVersion,
 		SystemVersion:    systemVersion,
 		Description:      issue.Description,
@@ -425,9 +427,17 @@ type checkIssueParam struct {
 	issueNumber   string
 	issueId       int32
 	issueCreateAt time.Time
+	issueAssigner *sdk.UserHook
 }
 
 func (impl eventHandler) checkIssue(cp checkIssueParam) error {
+	if cp.issueAssigner == nil {
+		err := impl.setIssueAssignee(cp.namespace, cp.issueNumber)
+		if err != nil {
+			logrus.Errorf("set issue assignee error: %s", err.Error())
+		}
+	}
+
 	dp := dealIssueParam{
 		namespace:   cp.namespace,
 		name:        cp.name,
@@ -563,3 +573,16 @@ func (impl eventHandler) setDeadline(name string, createAt time.Time) IssueParam
 		Deadline:      dl,
 	}
 } */
+
+func (impl eventHandler) setIssueAssignee(namespace, number string) error {
+	assigner := CommitterInstance.getAssigner(namespace)
+	if assigner == "" {
+		return fmt.Errorf("%s get assigner error", namespace)
+	}
+
+	if _, err := impl.cli.UpdateIssue(namespace, number, sdk.IssueUpdateParam{Assignee: assigner}); err != nil {
+		return err
+	}
+
+	return nil
+}
