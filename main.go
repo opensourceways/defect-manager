@@ -141,6 +141,8 @@ func run(cfg *config.Config, o options) {
 		return
 	}
 
+	//issue.CommitterInstance.InitEnterpriseId(cfg.Issue.RobotToken)
+
 	go func() {
 		issue.CommitterInstance.InitCommitterCache()
 

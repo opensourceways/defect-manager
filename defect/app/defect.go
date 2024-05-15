@@ -79,8 +79,6 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 		return
 	}
 
-	logrus.Infof("defects : %s", defects)
-
 	var versionForDefects domain.Defects
 	for _, d := range defects {
 		for _, av := range d.AffectedVersion {
@@ -119,7 +117,6 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 		}
 	}
 
-	logrus.Infof("publishedNum : %s", publishedNum)
 	logrus.Infof("unpublishedDefects : %s", unpublishedDefects)
 	dto = ToCollectDefectsDTO(unpublishedDefects)
 
