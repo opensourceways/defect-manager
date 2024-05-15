@@ -3,7 +3,6 @@ package issue
 import (
 	"errors"
 	"testing"
-	"time"
 
 	sdk "github.com/opensourceways/go-gitee/gitee"
 
@@ -76,7 +75,7 @@ func (t serviceTest) SaveDefects(app.CmdToSaveDefect) error {
 	return nil
 }
 
-func (t serviceTest) CollectDefects(time time.Time) ([]app.CollectDefectsDTO, error) {
+func (t serviceTest) CollectDefects(string) ([]app.CollectDefectsDTO, error) {
 	return nil, nil
 }
 

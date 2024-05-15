@@ -1,9 +1,11 @@
 package issue
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/opensourceways/defect-manager/defect/app"
 	"github.com/opensourceways/defect-manager/defect/domain"
 	"github.com/opensourceways/defect-manager/defect/domain/dp"
+	defectUtils "github.com/opensourceways/defect-manager/utils"
 )
 
 var Instance *eventHandler
@@ -462,15 +465,14 @@ func (impl eventHandler) checkIssue(cp checkIssueParam) error {
 		return fmt.Errorf("update issue error: %s", err.Error())
 	}
 
-	return nil
-	/* 	dl := deadLineParam{
-	   		name:         cp.name,
-	   		enterpriseId: impl.cfg.EnterpriseId,
-	   		issueId:      cp.issueId,
-	   		issueCreatAt: cp.issueCreateAt,
-	   	}
+	dl := deadLineParam{
+		name:         cp.name,
+		enterpriseId: impl.cfg.EnterpriseId,
+		issueId:      cp.issueId,
+		issueCreatAt: cp.issueCreateAt,
+	}
 
-	   	return impl.updateIssueDeadline(dl) */
+	return impl.updateIssueDeadline(dl)
 }
 
 type dealIssueParam struct {
@@ -518,7 +520,7 @@ func (impl eventHandler) dealIssue(dp dealIssueParam) (string, error) {
 	return newbody, impl.cli.CreateIssueComment(dp.namespace, dp.name, dp.issueNumber, firstComment)
 }
 
-/* type deadLineParam struct {
+type deadLineParam struct {
 	name         string
 	enterpriseId string
 	issueId      int32
@@ -572,7 +574,7 @@ func (impl eventHandler) setDeadline(name string, createAt time.Time) IssueParam
 		PlanStartedAt: startAt,
 		Deadline:      dl,
 	}
-} */
+}
 
 func (impl eventHandler) setIssueAssignee(namespace, number string) error {
 	assigner := CommitterInstance.getAssigner(namespace)

@@ -17,8 +17,6 @@ const (
 	fixedLabel      = "DEFECT/FIXED"
 	unFixedLabel    = "DEFECT/UNFIXED"
 
-	enterPrisePath = "src-openeuler"
-
 	itemDescription                   = "description"
 	itemOS                            = "os"
 	itemKernel                        = "kernel"

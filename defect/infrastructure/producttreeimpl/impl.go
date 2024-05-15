@@ -87,9 +87,6 @@ func (impl *productTreeImpl) ParseRPM(defectTime time.Time, component, version s
 	buf := bytes.NewBuffer(impl.rpmCache[version])
 	layout := "20060102 15-04-05"
 	targetLayout := "2006-01-02 15:04:05"
-	logrus.Infof("defectTime : %s", defectTime)
-	logrus.Infof("component : %s", component)
-	logrus.Infof("version : %s", version)
 
 	var rpmOfComponent string
 	for {

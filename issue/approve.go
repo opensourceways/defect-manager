@@ -18,11 +18,6 @@ type ResContent struct {
 	Name string `json:"name"`
 }
 
-/* type ResEnterpriseList struct {
-	Id   int32  `json:"id"`
-	Path string `json:"path"`
-} */
-
 type ResCommitter struct {
 	Data struct {
 		Maintainers      []string `json:"maintainers"`
@@ -158,35 +153,3 @@ func (c *committerCache) getSig() []string {
 
 	return sig
 }
-
-/* func (c *committerCache) InitEnterpriseId(access_token string) {
-	url := fmt.Sprintf("https://api.gitee.com/enterprises/list?access_token=%s", access_token)
-	request, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		logrus.Errorf("new request of enterprises list url error: %s ", err.Error())
-
-		return
-	}
-
-	cli := utils.NewHttpClient(3)
-	var res []ResEnterpriseList
-	r, _, err := cli.Download(request)
-	if err != nil {
-		logrus.Errorf("get enterprises list error: %s", err.Error())
-	}
-
-	if err = json.Unmarshal(r, &res); err != nil {
-		logrus.Errorf("unmarshal enterprises list error: %s", err.Error())
-
-		return
-	}
-
-	for _, v := range res {
-		if v.Path == enterPrisePath {
-			c.EnterpriseId = v.Id
-			break
-		}
-	}
-
-	logrus.Infof("enterprise id: %s", c.EnterpriseId)
-} */
