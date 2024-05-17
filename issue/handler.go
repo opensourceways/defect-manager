@@ -435,7 +435,7 @@ type checkIssueParam struct {
 
 func (impl eventHandler) checkIssue(cp checkIssueParam) error {
 	if cp.issueAssigner == nil {
-		err := impl.setIssueAssignee(cp.namespace, cp.issueNumber)
+		err := impl.setIssueAssignee(cp.namespace, cp.name, cp.issueNumber)
 		if err != nil {
 			logrus.Errorf("set issue assignee error: %s", err.Error())
 		}
@@ -576,8 +576,10 @@ func (impl eventHandler) setDeadline(name string, createAt time.Time) IssueParam
 	}
 }
 
-func (impl eventHandler) setIssueAssignee(namespace, number string) error {
-	assigner := CommitterInstance.getAssigner(namespace)
+func (impl eventHandler) setIssueAssignee(namespace, repo, number string) error {
+	pathWithNamespace := strings.Join([]string{namespace, repo}, "/")
+	logrus.Infof("pathWithNamespace: %s", pathWithNamespace)
+	assigner := CommitterInstance.getAssigner(pathWithNamespace)
 	if assigner == "" {
 		return fmt.Errorf("%s get assigner error", namespace)
 	}
