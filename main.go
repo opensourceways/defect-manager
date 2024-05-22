@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"os"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	kafka "github.com/opensourceways/kafka-lib/agent"
@@ -141,7 +140,7 @@ func run(cfg *config.Config, o options) {
 		return
 	}
 
-	go func() {
+	/* 	go func() {
 		issue.CommitterInstance.InitCommitterCache()
 
 		ticker := time.NewTicker(issue.TickerInterval * time.Hour)
@@ -153,7 +152,7 @@ func run(cfg *config.Config, o options) {
 				issue.CommitterInstance.InitCommitterCache()
 			}
 		}
-	}()
+	}() */
 
 	// run http server
 	server2.StartWebServer(o.service.Port, o.service.GracePeriod, func(engine *gin.Engine) {

@@ -125,7 +125,7 @@ func (impl eventHandler) handleIssueReject(e *sdk.IssueEvent) error {
 				return err
 			}
 
-			str2 := fmt.Sprintf(rejectComment, "@"+e.Assignee.UserName)
+			str2 := fmt.Sprintf(rejectComment, "@"+e.Assignee.UserName, e.Issue.StateName)
 			return commentIssue(str2)
 		}
 	}
@@ -146,7 +146,7 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 		)
 	}
 
-	issueInfo, err := impl.parseIssue(e.Issue.Body)
+	issueInfo, err := impl.parseIssue(e.Issue.Assignee, e.Issue.Body)
 	if err != nil {
 		return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
 	}
@@ -162,7 +162,7 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 		return commentIssue("未对受影响版本排查/abi变化进行分析，重新打开issue")
 	}
 
-	commentInfo, err := impl.parseComment(comment)
+	commentInfo, err := impl.parseComment(comment, e.Issue.Assignee)
 	if err != nil {
 		return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
 	}
@@ -218,6 +218,10 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 }
 
 func (impl eventHandler) handleIssueOpen(e *sdk.IssueEvent) error {
+	if *e.Action == "assign" {
+		return nil
+	}
+
 	cp := checkIssueParam{
 		namespace:     e.Project.Namespace,
 		name:          e.Project.Name,
@@ -225,7 +229,8 @@ func (impl eventHandler) handleIssueOpen(e *sdk.IssueEvent) error {
 		issueNumber:   e.Issue.Number,
 		issueId:       e.Issue.Id,
 		issueCreateAt: e.Issue.CreatedAt,
-		issueAssigner: e.Assignee,
+		issueUser:     e.User,
+		issueAssigner: e.Issue.Assignee,
 	}
 
 	return impl.checkIssue(cp)
@@ -234,7 +239,8 @@ func (impl eventHandler) handleIssueOpen(e *sdk.IssueEvent) error {
 // || e.Comment.User.Login == impl.botName
 func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
 	if !e.IsIssue() || e.Issue.TypeName != impl.cfg.IssueType ||
-		e.Issue.State == sdk.StatusClosed || e.Comment.User.Login == impl.botName {
+		e.Issue.StateName == StatusFinished || e.Issue.StateName == StatusCancel ||
+		e.Issue.StateName == StatusSuspend || e.Comment.User.Login == impl.botName {
 		return nil
 	}
 	commentIssue := func(content string) error {
@@ -251,6 +257,7 @@ func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
 			issueNumber:   e.Issue.Number,
 			issueId:       e.Issue.Id,
 			issueCreateAt: e.Issue.CreatedAt,
+			issueUser:     e.Issue.User,
 			issueAssigner: e.Issue.Assignee,
 		}
 
@@ -258,12 +265,12 @@ func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
 	}
 
 	if strings.Contains(e.Comment.Body, influence) {
-		issueInfo, err := impl.parseIssue(e.Issue.Body)
+		issueInfo, err := impl.parseIssue(e.Issue.Assignee, e.Issue.Body)
 		if err != nil {
 			return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
 		}
 
-		commentInfo, err := impl.parseComment(e.Comment.Body)
+		commentInfo, err := impl.parseComment(e.Comment.Body, e.Comment.User)
 		if err != nil {
 			return commentIssue(err.Error())
 		}
@@ -304,10 +311,17 @@ func (impl eventHandler) getAnalysisComment(e *sdk.IssueEvent) string {
 		return ""
 	}
 
-	for i := len(comments) - 1; i >= 0; i-- {
+	/* 	for i := len(comments) - 1; i >= 0; i-- {
 		if strings.Contains(comments[i].Body, influence) &&
 			comments[i].User.Login != impl.botName &&
 			CommitterInstance.isCommitter(e.Repository.PathWithNamespace, comments[i].User.Login) {
+			return comments[i].Body
+		}
+	} */
+
+	for i := len(comments) - 1; i >= 0; i-- {
+		if strings.Contains(comments[i].Body, influence) &&
+			comments[i].User.Login != impl.botName {
 			return comments[i].Body
 		}
 	}
@@ -430,6 +444,7 @@ type checkIssueParam struct {
 	issueNumber   string
 	issueId       int32
 	issueCreateAt time.Time
+	issueUser     *sdk.UserHook
 	issueAssigner *sdk.UserHook
 }
 
@@ -453,7 +468,7 @@ func (impl eventHandler) checkIssue(cp checkIssueParam) error {
 		return fmt.Errorf("deal issue error: %s", err.Error())
 	}
 
-	if _, err := impl.parseIssue(newbody); err != nil {
+	if _, err := impl.parseIssue(cp.issueUser, newbody); err != nil {
 		return impl.cli.CreateIssueComment(cp.namespace,
 			cp.name, cp.issueNumber, strings.Replace(err.Error(), ". ", "\n\n", -1),
 		)
@@ -472,7 +487,33 @@ func (impl eventHandler) checkIssue(cp checkIssueParam) error {
 		issueCreatAt: cp.issueCreateAt,
 	}
 
-	return impl.updateIssueDeadline(dl)
+	if err := impl.updateIssueDeadline(dl); err != nil {
+		return err
+	}
+
+	comments, err := impl.cli.ListIssueComments(dp.namespace, dp.name, dp.issueNumber)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range comments {
+		if strings.Contains(v.Body, "issue处理注意事项") {
+			return nil
+		}
+	}
+	/* 	committerList := CommitterInstance.listCommitter(strings.Join([]string{dp.namespace, dp.name}, "/"))
+	   	if len(committerList) == 0 {
+	   		return "", fmt.Errorf("获取committer列表失败，请联系管理员")
+	   	} */
+
+	committerList := []string{"Coopermassaki"}
+	firstComment := commentTemplate(impl.cfg.MaintainVersion, committerList)
+
+	if firstComment == "" {
+		return fmt.Errorf("issue comment template is empty")
+	}
+
+	return impl.cli.CreateIssueComment(dp.namespace, dp.name, dp.issueNumber, firstComment)
 }
 
 type dealIssueParam struct {
@@ -495,29 +536,7 @@ func (impl eventHandler) dealIssue(dp dealIssueParam) (string, error) {
 		newbody = issueUpdateParam.Body
 	}
 
-	comments, err := impl.cli.ListIssueComments(dp.namespace, dp.name, dp.issueNumber)
-	if err != nil {
-		return "", err
-	}
-
-	for _, v := range comments {
-		if strings.Contains(v.Body, "issue处理注意事项") {
-			return newbody, nil
-		}
-	}
-	logrus.Infof("repo: %s", strings.Join([]string{dp.namespace, dp.name}, "/"))
-	committerList := CommitterInstance.listCommitter(strings.Join([]string{dp.namespace, dp.name}, "/"))
-	if len(committerList) == 0 {
-		return "", fmt.Errorf("获取committer列表失败，请联系管理员")
-	}
-
-	firstComment := commentTemplate(impl.cfg.MaintainVersion, committerList)
-
-	if firstComment == "" {
-		return newbody, fmt.Errorf("issue comment template is empty")
-	}
-
-	return newbody, impl.cli.CreateIssueComment(dp.namespace, dp.name, dp.issueNumber, firstComment)
+	return newbody, nil
 }
 
 type deadLineParam struct {
@@ -579,7 +598,8 @@ func (impl eventHandler) setDeadline(name string, createAt time.Time) IssueParam
 func (impl eventHandler) setIssueAssignee(namespace, repo, number string) error {
 	pathWithNamespace := strings.Join([]string{namespace, repo}, "/")
 	logrus.Infof("pathWithNamespace: %s", pathWithNamespace)
-	assigner := CommitterInstance.getAssigner(pathWithNamespace)
+	//assigner := CommitterInstance.getAssigner(pathWithNamespace)
+	assigner := "Coopermassaki"
 	if assigner == "" {
 		return fmt.Errorf("%s get assigner error", namespace)
 	}
