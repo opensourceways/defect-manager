@@ -102,8 +102,6 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 		}
 	}
 
-	logrus.Infof("rpmForDefects : %s", rpmForDefects)
-
 	publishedNum, err := d.backend.PublishedDefects()
 	if err != nil {
 		return
@@ -117,7 +115,6 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 		}
 	}
 
-	logrus.Infof("unpublishedDefects : %s", unpublishedDefects)
 	dto = ToCollectDefectsDTO(unpublishedDefects)
 
 	return

@@ -31,6 +31,8 @@ const (
 	itemReferenceAndGuidanceUrl       = "referenceAndGuidanceUrl"
 	itemInfluence                     = "influence"
 	itemSeverityLevel                 = "severityLevel"
+	itemRootCause                     = "rootCause"
+	itemSelfTestResult                = "selfTestResult"
 	itemAffectedVersion               = "affectedVersion"
 	itemAbi                           = "abi"
 
@@ -75,6 +77,8 @@ var (
 		itemReferenceAndGuidanceUrl:       "详情及分析指导参考链接",
 		itemInfluence:                     "影响性分析说明",
 		itemSeverityLevel:                 "缺陷严重等级",
+		itemRootCause:                     "缺陷根因定位",
+		itemSelfTestResult:                "开发自验结果",
 		itemAffectedVersion:               "受影响版本",
 		itemAbi:                           "abi",
 	}
@@ -91,7 +95,9 @@ var (
 		itemTitleComponents:               regexp.MustCompile(`(缺陷所属软件及版本号)[】][(（]必填，如kernel-4.19[)）]([\s\S]*?)\*\*【环境信息`),
 		itemTitleProblemReproductionSteps: regexp.MustCompile(`(问题复现步骤)[】][(（]必填[)）][:：]请描述具体的操作步骤([\s\S]*?)\*\*【实际结果`),
 		itemInfluence:                     regexp.MustCompile(`(影响性分析说明)[:：]([\s\S]*?)缺陷严重等级`),
-		itemSeverityLevel:                 regexp.MustCompile(`(缺陷严重等级)[:：]\(Critical/High/Moderate/Low\)([\s\S]*?)受影响版本排查`),
+		itemSeverityLevel:                 regexp.MustCompile(`(缺陷严重等级)[:：]\(Critical/High/Moderate/Low\)([\s\S]*?)缺陷根因定位`),
+		itemRootCause:                     regexp.MustCompile(`(缺陷根因定位)[:：]([\s\S]*?)开发自验结果`),
+		itemSelfTestResult:                regexp.MustCompile(`(开发自验结果)[(（]选填[)）][:：]([\s\S]*?)受影响版本排查`),
 		itemAffectedVersion:               regexp.MustCompile(`(受影响版本排查)\(受影响/不受影响\)[:：]([\s\S]*?)abi变化`),
 		itemAbi:                           regexp.MustCompile(`(abi变化)\(是/否\)[:：]([\s\S]*?)$`),
 	}
@@ -115,13 +121,15 @@ var (
 	sortOfCommentItems = []string{
 		itemInfluence,
 		itemSeverityLevel,
+		itemRootCause,
+		itemSelfTestResult,
+		itemSelfTestResult,
 		itemAffectedVersion,
 		itemAbi,
 	}
 
 	noTrimItem = map[string]bool{
 		itemDescription: true,
-		itemInfluence:   true,
 	}
 
 	severityLevelMap = map[string]bool{
@@ -143,6 +151,8 @@ type parseIssueResult struct {
 type parseCommentResult struct {
 	Influence        string
 	SeverityLevel    string
+	RootCause        string
+	SelfTestResult   string
 	AllVersionResult []string
 	AllAbiResult     []string
 	AffectedVersion  []string
@@ -198,6 +208,14 @@ func (impl eventHandler) parseComment(assigner *sdk.UserHook, body string) (pars
 		ret.SeverityLevel = v
 	}
 
+	if v, ok := result[itemRootCause]; ok {
+		ret.RootCause = v
+	}
+
+	if v, ok := result[itemSelfTestResult]; ok {
+		ret.SelfTestResult = v
+	}
+
 	if v, ok := result[itemAffectedVersion]; ok {
 		allVersionResult, verison, err := impl.parseVersion(v, assigner)
 		if err != nil {
@@ -242,8 +260,8 @@ func (impl eventHandler) parse(items []string, assigner *sdk.UserHook, body stri
 
 		matchItem := match[regMatchResult][regMatchItem]
 		trimItemInfo := localutils.TrimString(matchItem)
-		if trimItemInfo == "" {
-			mr.Add(fmt.Sprintf("%s 不允许为空", itemName[item]))
+		if trimItemInfo == "" && item != itemSelfTestResult {
+			mr.Add(fmt.Sprintf("%s %s 不允许为空", assign, itemName[item]))
 			continue
 		}
 

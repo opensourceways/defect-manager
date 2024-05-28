@@ -26,6 +26,7 @@ type Defect struct {
 	GuidanceURL      dp.URL
 	Influence        string
 	SeverityLevel    dp.SeverityLevel
+	RootCause        string
 	AffectedVersion  []dp.SystemVersion
 	ABI              string
 	Issue            Issue

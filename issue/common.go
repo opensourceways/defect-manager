@@ -14,6 +14,10 @@ const feedback = `
 
 缺陷严重等级:(Critical/High/Moderate/Low)
 
+缺陷根因定位:
+
+开发自验结果(选填):
+
 受影响版本排查(受影响/不受影响):
 %v
 修复是否涉及abi变化(是/否):
@@ -21,9 +25,13 @@ const feedback = `
 `
 
 const commentFeedback = `
-影响性分析说明：
+影响性分析说明:
 %v
 缺陷严重等级:(Critical/High/Moderate/Low)
+%v
+缺陷根因定位:
+%v
+开发自验结果(选填):
 %v
 受影响版本排查(受影响/不受影响):
 %v
@@ -31,10 +39,6 @@ const commentFeedback = `
 %v
 `
 
-const bulletinPublishFeedback = `
-**三、缺陷修复**
-缺陷公告链接：%v
-`
 const suspendTip = `
 %v
 **issue变更为 [已取消/已挂起] 状态时，必须由操作者填写相关原因，现issue被重新打开**
@@ -59,6 +63,10 @@ const commentCopyValue = `
 
 缺陷严重等级:(Critical/High/Moderate/Low)
 
+缺陷根因定位:
+
+开发自验结果(选填):
+
 受影响版本排查(受影响/不受影响): 
 %v
 abi变化(是/否):
@@ -79,17 +87,33 @@ const rejectComment = `
 %v 当前issue状态为: %v,请先修改issue状态, 否则评论无法被识别.
 `
 
-const tb = `
+const tb1 = `
 %v 经过defect-manager解析，已分析的内容如下表所示:
 		| 状态  | 需分析 | 内容 |
 |:--:|:--:|---------|
 |已分析|1.影响性分析说明|%v|
 |已分析|2.缺陷严重等级|%v|
-|已分析|3.受影响版本排查|%v|
-|已分析|4.abi变化|%v|
+|已分析|3.缺陷根因定位|%v|
+|已分析|4.受影响版本排查|%v|
+|已分析|5.abi变化|%v|
 
 **请确认分析内容的准确性，确认无误后，您可以进行后续步骤，否则您可以继续分析**
 `
+
+const tb2 = `
+%v 经过defect-manager解析，已分析的内容如下表所示:
+		| 状态  | 需分析 | 内容 |
+|:--:|:--:|---------|
+|已分析|1.影响性分析说明|%v|
+|已分析|2.缺陷严重等级|%v|
+|已分析|3.缺陷根因定位|%v|
+|已分析|4.开发自验结果|%v|
+|已分析|5.受影响版本排查|%v|
+|已分析|6.abi变化|%v|
+
+**请确认分析内容的准确性，确认无误后，您可以进行后续步骤，否则您可以继续分析**
+`
+
 const reOpenComment = `
 关闭issue前,需要将受影响的分支在合并pr时关联上当前issue编号: #%v
 受影响分支: %v
@@ -154,11 +178,25 @@ func analysisComplete(assigner *sdk.UserHook, anlysisComment parseCommentResult)
 	}
 
 	assigning := "@" + assigner.UserName
+	if anlysisComment.SelfTestResult != "" {
+		return fmt.Sprintf(
+			tb2,
+			assigning,
+			strings.ReplaceAll(anlysisComment.Influence, "\r\n", ""),
+			anlysisComment.SeverityLevel,
+			anlysisComment.RootCause,
+			anlysisComment.SelfTestResult,
+			strings.Join(anlysisComment.AllVersionResult, ","),
+			strings.Join(anlysisComment.AllAbiResult, ","),
+		)
+	}
+
 	return fmt.Sprintf(
-		tb,
+		tb1,
 		assigning,
 		strings.ReplaceAll(anlysisComment.Influence, "\r\n", ""),
 		anlysisComment.SeverityLevel,
+		anlysisComment.RootCause,
 		strings.Join(anlysisComment.AllVersionResult, ","),
 		strings.Join(anlysisComment.AllAbiResult, ","),
 	)
@@ -189,7 +227,8 @@ func generateanalysisCommentFeedbackBody(body string, comment parseCommentResult
 	match := regItemFirstPartDefectInfo.FindAllStringSubmatch(body, -1)
 	matchBody := match[regMatchResult][regMatchResult]
 
-	analysisBody := fmt.Sprintf(commentFeedback, comment.Influence, comment.SeverityLevel,
+	analysisBody := fmt.Sprintf(commentFeedback, comment.Influence,
+		comment.SeverityLevel, comment.RootCause, comment.SelfTestResult,
 		strings.Join(comment.AllVersionResult, "\n"), strings.Join(comment.AllAbiResult, "\n"))
 
 	return matchBody + analysisBody

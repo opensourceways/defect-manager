@@ -347,6 +347,7 @@ func (impl eventHandler) toCmd(title, number, namespace, name string, issue pars
 		GuidanceURL:      nil,
 		Influence:        comment.Influence,
 		SeverityLevel:    securityLevel,
+		RootCause:        comment.RootCause,
 		AffectedVersion:  affectedVersion,
 		ABI:              strings.Join(comment.Abi, ","),
 		Issue: domain.Issue{
@@ -400,28 +401,6 @@ func (impl eventHandler) checkRelatedPR(e *sdk.IssueEvent, versions []string) []
 	}
 
 	return nil
-}
-
-func (impl eventHandler) listMilestones(e *sdk.IssueEvent) (mts []sdk.Milestone, err error) {
-	endpoint := fmt.Sprintf("https://gitee.com/api/v5/repos/%v/%v/milestones?access_token=%s",
-		e.Project.Namespace, e.Project.Name, impl.cfg.RobotToken,
-	)
-	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	cli := utils.NewHttpClient(3)
-	bytes, _, err := cli.Download(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := json.Unmarshal(bytes, &mts); err != nil {
-		return nil, err
-	}
-
-	return mts, err
 }
 
 type checkIssueParam struct {
@@ -489,7 +468,6 @@ func (impl eventHandler) dealIssue(dp dealIssueParam) (string, error) {
 	if !strings.Contains(dp.issueBody, "二、缺陷分析结构反馈") {
 		issueUpdateParam := addAnalysisFeedback(dp.issueBody, dp.name, impl.cfg.MaintainVersion)
 
-		//logrus.Infof("namespace: %s, issueNumber: %s, issueUpdateParam: %s", dp.namespace, dp.issueNumber, issueUpdateParam.Body)
 		if _, err := impl.cli.UpdateIssue(dp.namespace, dp.issueNumber, issueUpdateParam); err != nil {
 			return newbody, fmt.Errorf("update issue error: %s", err.Error())
 		}

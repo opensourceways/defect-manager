@@ -25,6 +25,7 @@ type defectDO struct {
 	GuidanceURL      string         `gorm:"column:guidance_url"`
 	Influence        string         `gorm:"column:influence"`
 	SeverityLevel    string         `gorm:"column:severity_level"`
+	RootCause        string         `gorm:"column:root_cause"`
 	AffectedVersion  pq.StringArray `gorm:"column:affected_version;type:text[];default:'{}'"`
 	ABI              string         `gorm:"column:abi"`
 	CreatedAt        time.Time      `gorm:"column:created_at;<-:create;index"`
@@ -51,8 +52,10 @@ func (impl defectImpl) toDefectDO(defect *domain.Defect) defectDO {
 		GuidanceURL:      "",
 		Influence:        defect.Influence,
 		SeverityLevel:    defect.SeverityLevel.String(),
-		AffectedVersion:  toStringArray(defect.AffectedVersion),
-		ABI:              defect.ABI,
+		RootCause:        defect.RootCause,
+
+		AffectedVersion: toStringArray(defect.AffectedVersion),
+		ABI:             defect.ABI,
 	}
 }
 
