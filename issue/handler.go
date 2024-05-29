@@ -107,19 +107,20 @@ func (impl eventHandler) handleIssueReject(e *sdk.IssueEvent) error {
 		return nil
 	}
 
-	if e.Assignee == nil {
-		logrus.Errorf("invalid issue assignee ")
-		return nil
-	}
-
 	for i := len(comments) - 1; i >= 0; i-- {
 		if strings.Contains(comments[i].Body, "/reason") && comments[i].User.Login != impl.botName {
-			str1 := fmt.Sprintf(rejectTb, e.Issue.StateName, e.Issue.Assignee.UserName, strings.ReplaceAll(comments[i].Body, "/reason", ""))
+			newLabels := dealLabels(e.Issue.Labels, fixedLabel)
+			if _, err := impl.cli.UpdateIssue(e.Project.Namespace, e.Issue.Number,
+				sdk.IssueUpdateParam{Labels: newLabels, Repo: e.Project.Name}); err != nil {
+				return fmt.Errorf("update issue error: %s", err.Error())
+			}
+
+			str1 := fmt.Sprintf(rejectTb, e.Issue.StateName, e.Sender.UserName, strings.ReplaceAll(comments[i].Body, "/reason", ""))
 			if err := commentIssue(str1); err != nil {
 				return err
 			}
 
-			str2 := fmt.Sprintf(rejectComment, "@"+e.Assignee.UserName, e.Issue.StateName)
+			str2 := fmt.Sprintf(rejectComment, "@"+e.Sender.UserName, e.Issue.StateName)
 			return commentIssue(str2)
 		}
 	}
@@ -130,7 +131,7 @@ func (impl eventHandler) handleIssueReject(e *sdk.IssueEvent) error {
 
 	logrus.Infof("reopen issue %s %s", e.Project.PathWithNamespace, e.Issue.Number)
 
-	return commentIssue(fmt.Sprintf(suspendTip, "@"+e.Assignee.UserName))
+	return commentIssue(fmt.Sprintf(suspendTip, "@"+e.Sender.UserName))
 }
 
 func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
@@ -140,7 +141,7 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 		)
 	}
 
-	issueInfo, err := impl.parseIssue(e.Issue.Assignee, e.Issue.Body)
+	issueInfo, err := impl.parseIssue(e.Sender, e.Issue.Body)
 	if err != nil {
 		return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
 	}
@@ -153,17 +154,18 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 
 		logrus.Infof("reopen issue %s %s", e.Project.PathWithNamespace, e.Issue.Number)
 
-		return commentIssue("未对受影响版本排查/abi变化进行分析，重新打开issue")
+		return commentIssue(fmt.Sprintf("%s 未对受影响版本排查/abi变化进行分析，重新打开issue", e.Sender.UserName))
 	}
 
-	commentInfo, err := impl.parseComment(e.Issue.Assignee, comment)
+	commentInfo, err := impl.parseComment(e.Sender, comment)
 	if err != nil {
 		return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
 	}
 
 	if len(commentInfo.AffectedVersion) == 0 {
+		newLabels := dealLabels(e.Issue.Labels, unAffectedLabel)
 		if _, err := impl.cli.UpdateIssue(e.Project.Namespace, e.Issue.Number,
-			sdk.IssueUpdateParam{Labels: unAffectedLabel, Repo: e.Project.Name}); err != nil {
+			sdk.IssueUpdateParam{Labels: newLabels, Repo: e.Project.Name}); err != nil {
 			return fmt.Errorf("update issue error: %s", err.Error())
 		}
 
@@ -179,6 +181,12 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 	}
 
 	if exist {
+		newLabels := dealLabels(e.Issue.Labels, fixedLabel)
+		if _, err := impl.cli.UpdateIssue(e.Project.Namespace, e.Issue.Number,
+			sdk.IssueUpdateParam{Labels: newLabels, Repo: e.Project.Name}); err != nil {
+			return fmt.Errorf("update issue error: %s", err.Error())
+		}
+
 		return nil
 	}
 
@@ -189,7 +197,7 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 
 		logrus.Infof("reopen issue %s %s", e.Project.PathWithNamespace, e.Issue.Number)
 
-		str := fmt.Sprintf(reOpenComment, e.Issue.Number, strings.Join(relatedPRNotMerged, "/"), PrIssueLink)
+		str := fmt.Sprintf(reOpenComment, e.Sender.UserName, e.Issue.Number, strings.Join(relatedPRNotMerged, "/"), PrIssueLink)
 		return commentIssue(str)
 	}
 
@@ -200,15 +208,18 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 
 	err = impl.service.SaveDefects(cmd)
 	if err == nil {
+		newLabels := dealLabels(e.Issue.Labels, fixedLabel)
 		if _, err := impl.cli.UpdateIssue(e.Project.Namespace, e.Issue.Number,
-			sdk.IssueUpdateParam{Labels: fixedLabel, Repo: e.Project.Name}); err != nil {
+			sdk.IssueUpdateParam{Labels: newLabels, Repo: e.Project.Name}); err != nil {
 			return fmt.Errorf("update issue error: %s", err.Error())
 		}
 
 		return nil
 	}
 
-	return commentIssue("when save defect, some err occurred: " + err.Error())
+	logrus.Errorf("when save defect some err occurred: %s", err.Error())
+
+	return nil
 }
 
 func (impl eventHandler) handleIssueOpen(e *sdk.IssueEvent) error {
@@ -225,6 +236,7 @@ func (impl eventHandler) handleIssueOpen(e *sdk.IssueEvent) error {
 		issueCreateAt: e.Issue.CreatedAt,
 		issueUser:     e.User,
 		issueAssigner: e.Assignee,
+		labels:        e.Issue.Labels,
 	}
 
 	return impl.checkIssue(cp)
@@ -253,13 +265,14 @@ func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
 			issueCreateAt: e.Issue.CreatedAt,
 			issueUser:     e.Issue.User,
 			issueAssigner: e.Issue.Assignee,
+			labels:        e.Issue.Labels,
 		}
 
 		return impl.checkIssue(cp)
 	}
 
 	if strings.Contains(e.Comment.Body, influence) {
-		issueInfo, err := impl.parseIssue(e.Issue.Assignee, e.Issue.Body)
+		issueInfo, err := impl.parseIssue(e.Comment.User, e.Issue.Body)
 		if err != nil {
 			return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
 		}
@@ -412,6 +425,7 @@ type checkIssueParam struct {
 	issueCreateAt time.Time
 	issueUser     *sdk.UserHook
 	issueAssigner *sdk.UserHook
+	labels        []sdk.LabelHook
 }
 
 func (impl eventHandler) checkIssue(cp checkIssueParam) error {
@@ -440,7 +454,7 @@ func (impl eventHandler) checkIssue(cp checkIssueParam) error {
 		)
 	}
 
-	issueUpdateParam := modifyIssueBodyStyle(newbody, cp.name)
+	issueUpdateParam := modifyIssueBodyStyle(cp.labels, newbody, cp.name)
 
 	if _, err := impl.cli.UpdateIssue(cp.namespace, cp.issueNumber, issueUpdateParam); err != nil {
 		return fmt.Errorf("update issue error: %s", err.Error())
@@ -464,7 +478,7 @@ type dealIssueParam struct {
 }
 
 func (impl eventHandler) dealIssue(dp dealIssueParam) (string, error) {
-	newbody := dp.issueBody // new type
+	newbody := dp.issueBody
 	if !strings.Contains(dp.issueBody, "二、缺陷分析结构反馈") {
 		issueUpdateParam := addAnalysisFeedback(dp.issueBody, dp.name, impl.cfg.MaintainVersion)
 

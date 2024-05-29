@@ -57,7 +57,7 @@ const commentCopyValue = `
 | 指令  | 指令说明 | 使用权限 |
 |:--:|:--:|---------|
 |/check-issue|校验issue格式|不限|
-|/reason xxx|/reason +挂起或拒绝条件|不限|
+|/reason xxx|/reason +挂起或取消条件|不限|
 ************************************************************************
 影响性分析说明: 
 
@@ -84,7 +84,7 @@ const rejectTb = `
 `
 
 const rejectComment = `
-%v 当前issue状态为: %v,请先修改issue状态, 否则评论无法被识别.
+%v 当前issue状态为: %v，若要追加评论，请先修改issue状态，否则评论无法被识别.
 `
 
 const tb1 = `
@@ -115,6 +115,7 @@ const tb2 = `
 `
 
 const reOpenComment = `
+@%s
 关闭issue前,需要将受影响的分支在合并pr时关联上当前issue编号: #%v
 受影响分支: %v
 具体操作参考: %v
@@ -122,7 +123,7 @@ const reOpenComment = `
 
 const commentVersionTip = `
 %v 请确认分支: %v.
-**请确认分支信息是否填写完整，否则将无法关闭当前issue.**
+**请确认%v是否填写完整，否则将无法关闭当前issue.**
 `
 
 const (
@@ -177,6 +178,10 @@ func analysisComplete(assigner *sdk.UserHook, anlysisComment parseCommentResult)
 		return ""
 	}
 
+	if anlysisComment.RootCause == "" {
+		anlysisComment.RootCause = "无"
+	}
+
 	assigning := "@" + assigner.UserName
 	if anlysisComment.SelfTestResult != "" {
 		return fmt.Sprintf(
@@ -202,13 +207,15 @@ func analysisComplete(assigner *sdk.UserHook, anlysisComment parseCommentResult)
 	)
 }
 
-func modifyIssueBodyStyle(body, name string) sdk.IssueUpdateParam {
+func modifyIssueBodyStyle(labels []sdk.LabelHook, body, name string) sdk.IssueUpdateParam {
 	combinedRegex := regexp.MustCompile(`(?m)^### (.*?)(\r?\n)`)
 	newBody := combinedRegex.ReplaceAllString(body, "**$1**$2")
 
+	newLabels := dealLabels(labels, unFixedLabel)
+
 	return sdk.IssueUpdateParam{
 		Body:   newBody,
-		Labels: unFixedLabel,
+		Labels: newLabels,
 		Repo:   name,
 	}
 }
@@ -232,4 +239,22 @@ func generateanalysisCommentFeedbackBody(body string, comment parseCommentResult
 		strings.Join(comment.AllVersionResult, "\n"), strings.Join(comment.AllAbiResult, "\n"))
 
 	return matchBody + analysisBody
+}
+
+func dealLabels(labels []sdk.LabelHook, updateLabel string) string {
+	if len(labels) == 0 {
+		return updateLabel
+	}
+
+	var labelNames []string
+
+	for _, v := range labels {
+		if v.Name != unAffectedLabel && v.Name != fixedLabel && v.Name != unFixedLabel {
+			labelNames = append(labelNames, v.Name)
+		}
+	}
+
+	labelNames = append(labelNames, updateLabel)
+
+	return strings.Join(labelNames, ",")
 }

@@ -6,10 +6,9 @@ import (
 	"strings"
 
 	sdk "github.com/opensourceways/go-gitee/gitee"
-	"github.com/opensourceways/server-common-lib/utils"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	localutils "github.com/opensourceways/defect-manager/utils"
+	"github.com/opensourceways/defect-manager/utils"
 )
 
 const (
@@ -52,6 +51,8 @@ const (
 	parse     = "经过defect-manager解析"
 	failParse = "解析失败"
 	notNull   = "不允许为空"
+	pVersion  = "受影响分支"
+	pAbi      = "abi变化"
 
 	StatusTodo      = "待办的"
 	StatusRepairing = "修复中"
@@ -86,12 +87,12 @@ var (
 	regexpOfItems = map[string]*regexp.Regexp{
 		itemDescription:                   regexp.MustCompile(`(缺陷描述)[】][(（]必填[)）][:：]请补充详细的缺陷问题现象描述\*\*([\s\S]*?)\*\*一、缺陷信息`),
 		itemOS:                            regexp.MustCompile(`(缺陷所属的os版本)[】][(（]必填，如openEuler-22.03-LTS[)）]\*\*([\s\S]*?)\*\*【内核版本`),
-		itemKernel:                        regexp.MustCompile(`(内核版本)[】][(（]必填，如kernel-4.19[)）]\*\*([\s\S]*?)\*\*【缺陷所属软件及版本号`),
+		itemKernel:                        regexp.MustCompile(`(内核版本)[】][(（]必填，如kernel-5.10.0-60.138.0.165[)）]\*\*([\s\S]*?)\*\*【缺陷所属软件及版本号`),
 		itemComponents:                    regexp.MustCompile(`(缺陷所属软件及版本号)[】][(（]必填，如kernel-4.19[)）]\*\*([\s\S]*?)\*\*【环境信息`),
 		itemProblemReproductionSteps:      regexp.MustCompile(`(问题复现步骤)[】][(（]必填[)）][:：]请描述具体的操作步骤\*\*([\s\S]*?)\*\*【实际结果`),
 		itemTitleDescription:              regexp.MustCompile(`(缺陷描述)[】][(（]必填[)）][:：]请补充详细的缺陷问题现象描述([\s\S]*?)\*\*一、缺陷信息`),
 		itemTitleOS:                       regexp.MustCompile(`(缺陷所属的os版本)[】][(（]必填，如openEuler-22.03-LTS[)）]([\s\S]*?)### 【内核版本`),
-		itemTitleKernel:                   regexp.MustCompile(`(内核版本)[】][(（]必填，如kernel-4.19[)）]([\s\S]*?)### 【缺陷所属软件及版本号`),
+		itemTitleKernel:                   regexp.MustCompile(`(内核版本)[】][(（]必填，如kernel-5.10.0-60.138.0.165[)）]([\s\S]*?)### 【缺陷所属软件及版本号`),
 		itemTitleComponents:               regexp.MustCompile(`(缺陷所属软件及版本号)[】][(（]必填，如kernel-4.19[)）]([\s\S]*?)\*\*【环境信息`),
 		itemTitleProblemReproductionSteps: regexp.MustCompile(`(问题复现步骤)[】][(（]必填[)）][:：]请描述具体的操作步骤([\s\S]*?)\*\*【实际结果`),
 		itemInfluence:                     regexp.MustCompile(`(影响性分析说明)[:：]([\s\S]*?)缺陷严重等级`),
@@ -122,7 +123,6 @@ var (
 		itemInfluence,
 		itemSeverityLevel,
 		itemRootCause,
-		itemSelfTestResult,
 		itemSelfTestResult,
 		itemAffectedVersion,
 		itemAbi,
@@ -217,7 +217,7 @@ func (impl eventHandler) parseComment(assigner *sdk.UserHook, body string) (pars
 	}
 
 	if v, ok := result[itemAffectedVersion]; ok {
-		allVersionResult, verison, err := impl.parseVersion(v, assigner)
+		allVersionResult, verison, err := impl.parseVersion(v, itemAffectedVersion, assigner)
 		if err != nil {
 			return parseCommentResult{}, err
 		}
@@ -227,7 +227,7 @@ func (impl eventHandler) parseComment(assigner *sdk.UserHook, body string) (pars
 	}
 
 	if v, ok := result[itemAbi]; ok {
-		AllAbiResult, abi, err := impl.parseVersion(v, assigner)
+		AllAbiResult, abi, err := impl.parseVersion(v, itemAbi, assigner)
 		if err != nil {
 			return parseCommentResult{}, err
 		}
@@ -247,22 +247,29 @@ func (impl eventHandler) parse(items []string, assigner *sdk.UserHook, body stri
 
 	mr := utils.NewMultiErrors()
 	genErr := func(item string) string {
-		return fmt.Sprintf("%s %s=> 没有按正确格式填写", assign, item)
+		return fmt.Sprintf("%s %s=>没有按正确格式填写", assign, item)
 	}
 
 	parseResult := make(map[string]string)
 	for _, item := range items {
 		match := regexpOfItems[item].FindAllStringSubmatch(body, -1)
 		if len(match) < 1 || len(match[regMatchResult]) < 3 {
-			mr.Add(fmt.Sprintf("%s %s=> 没有按正确格式填写", assign, itemName[item]))
+			mr.Add(genErr(itemName[item]))
 			continue
 		}
 
 		matchItem := match[regMatchResult][regMatchItem]
-		trimItemInfo := localutils.TrimString(matchItem)
-		if trimItemInfo == "" && item != itemSelfTestResult {
-			mr.Add(fmt.Sprintf("%s %s 不允许为空", assign, itemName[item]))
-			continue
+		trimItemInfo := utils.TrimString(matchItem)
+		if trimItemInfo == "" {
+			if item == itemRootCause && impl.isExistAffectedVersion(body) {
+				mr.Add(fmt.Sprintf("%s %s=>不允许为空", assign, itemName[item]))
+				continue
+			}
+
+			if item != itemSelfTestResult && item != itemRootCause {
+				mr.Add(fmt.Sprintf("%s %s=>不允许为空", assign, itemName[item]))
+				continue
+			}
 		}
 
 		if _, ok := noTrimItem[item]; ok {
@@ -281,7 +288,17 @@ func (impl eventHandler) parse(items []string, assigner *sdk.UserHook, body stri
 			if !maintainVersion.Has(parseResult[item]) {
 				mr.Add(genErr(itemName[itemOS]))
 			}
+		case itemTitleOS:
+			maintainVersion := sets.NewString(impl.cfg.MaintainVersion...)
+			if !maintainVersion.Has(parseResult[item]) {
+				mr.Add(genErr(itemName[itemOS]))
+			}
 		case itemComponents:
+			split := strings.Split(parseResult[item], "-")
+			if len(split) < 2 {
+				mr.Add(genErr(itemName[itemComponents]))
+			}
+		case itemTitleComponents:
 			split := strings.Split(parseResult[item], "-")
 			if len(split) < 2 {
 				mr.Add(genErr(itemName[itemComponents]))
@@ -292,7 +309,7 @@ func (impl eventHandler) parse(items []string, assigner *sdk.UserHook, body stri
 	return parseResult, mr.Err()
 }
 
-func (impl eventHandler) parseVersion(s string, assigner *sdk.UserHook) (versionAnalysisResult, affectedVersion []string, err error) {
+func (impl eventHandler) parseVersion(s, item string, assigner *sdk.UserHook) (versionAnalysisResult, affectedVersion []string, err error) {
 	var assign string
 	if assigner != nil {
 		assign = "@" + assigner.Name
@@ -342,8 +359,18 @@ func (impl eventHandler) parseVersion(s string, assigner *sdk.UserHook) (version
 	missingVersionsString := strings.Join(missingVersions, ",")
 
 	if len(missingVersions) > 0 {
-		return nil, nil, fmt.Errorf(fmt.Sprintf(commentVersionTip, assign, missingVersionsString))
+		if item == itemAffectedVersion {
+			return nil, nil, fmt.Errorf(fmt.Sprintf(commentVersionTip, assign, missingVersionsString, pVersion))
+		}
+		return nil, nil, fmt.Errorf(fmt.Sprintf(commentVersionTip, assign, missingVersionsString, pAbi))
 	}
 
 	return versionAnalysisResult, affectedVersion, nil
+}
+
+func (impl eventHandler) isExistAffectedVersion(s string) bool {
+	reg := regexp.MustCompile(`(openEuler.*?)[:：]\s*受影响`)
+	matches := reg.FindAllStringSubmatch(s, -1)
+
+	return len(matches) > 0
 }
