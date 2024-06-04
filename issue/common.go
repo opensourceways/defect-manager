@@ -126,6 +126,10 @@ const commentVersionTip = `
 **请确认%v是否填写完整，否则将无法关闭当前issue.**
 `
 
+const issueCheckSuccess = `
+@%s issue 校验成功
+`
+
 const (
 	commentCmd  = "https://gitee.com/Coopermassaki/cve-manager/blob/master/cve-vulner-manager/doc/md/defect-manager-manual.md"
 	PrIssueLink = "https://gitee.com/help/articles/4142"

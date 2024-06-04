@@ -460,6 +460,10 @@ func (impl eventHandler) checkIssue(cp checkIssueParam) error {
 		return fmt.Errorf("update issue error: %s", err.Error())
 	}
 
+	if err := impl.cli.CreateIssueComment(cp.namespace, cp.name, cp.issueNumber, fmt.Sprintf(issueCheckSuccess, cp.issueUser.UserName)); err != nil {
+		return fmt.Errorf("create issue comment error: %s", err.Error())
+	}
+
 	dl := deadLineParam{
 		name:         cp.name,
 		enterpriseId: impl.cfg.EnterpriseId,
