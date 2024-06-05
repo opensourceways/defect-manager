@@ -53,7 +53,7 @@ func (impl *productTreeImpl) InitCache() {
 	impl.initRPMCache()
 }
 
-//CleanCache use atomic to avoid cleaning when other tasks are being performed
+// CleanCache use atomic to avoid cleaning when other tasks are being performed
 func (impl *productTreeImpl) CleanCache() {
 	atomic.AddInt64(&impl.taskCount, -1)
 	if atomic.LoadInt64(&impl.taskCount) == 0 {
@@ -62,13 +62,16 @@ func (impl *productTreeImpl) CleanCache() {
 	}
 }
 
-func (impl *productTreeImpl) GetTree(component string, versions []dp.SystemVersion) (domain.ProductTree, error) {
+func (impl *productTreeImpl) GetTree(defectTime time.Time, component string, versions []dp.SystemVersion) (domain.ProductTree, error) {
 	affectedRPM := make(map[string]string)
 	for _, v := range versions {
 		key := fmt.Sprintf("%s_%s", component, v.String())
 		rpm, ok := impl.rpmOfComponentCache[key]
 		if !ok {
-			rpm = impl.parseRPM(component, v.String())
+			rpm = impl.ParseRPM(defectTime, component, v.String())
+			if rpm == "" {
+				return nil, fmt.Errorf("parse rpm error")
+			}
 			impl.rpmOfComponentCache[key] = rpm
 		}
 
@@ -78,10 +81,12 @@ func (impl *productTreeImpl) GetTree(component string, versions []dp.SystemVersi
 	return impl.buildTree(affectedRPM), nil
 }
 
-func (impl *productTreeImpl) parseRPM(component, version string) string {
+func (impl *productTreeImpl) ParseRPM(defectTime time.Time, component, version string) string {
 	// content of buf, example:
 	// https://gitee.com/openeuler_latest_rpms/obs_pkg_rpms_20230517/raw/master/latest_rpm/openEuler-22.03-LTS.csv
 	buf := bytes.NewBuffer(impl.rpmCache[version])
+	layout := "20060102 15-04-05"
+	targetLayout := "2006-01-02 15:04:05"
 
 	var rpmOfComponent string
 	for {
@@ -100,8 +105,24 @@ func (impl *productTreeImpl) parseRPM(component, version string) string {
 		}
 
 		if split[1] == component {
-			rpmOfComponent = split[2]
-			break
+			parsedTime, err := time.Parse(layout, split[0])
+			if err != nil {
+				logrus.Errorf("parse time error %s", err.Error())
+				break
+			}
+
+			formattedTime := parsedTime.Format(targetLayout)
+
+			targetParsedTime, err := time.Parse(targetLayout, formattedTime)
+			if err != nil {
+				logrus.Errorf("parse targetParsedTime error %s", err.Error())
+				break
+			}
+
+			if targetParsedTime.After(defectTime) {
+				rpmOfComponent = split[2]
+				break
+			}
 		}
 	}
 

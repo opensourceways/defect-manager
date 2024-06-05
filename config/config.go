@@ -2,7 +2,7 @@ package config
 
 import (
 	kafka "github.com/opensourceways/kafka-lib/agent"
-	"github.com/opensourceways/server-common-lib/postgre"
+	postgres "github.com/opensourceways/server-common-lib/postgre"
 	"github.com/opensourceways/server-common-lib/utils"
 
 	"github.com/opensourceways/defect-manager/defect/infrastructure/backendimpl"

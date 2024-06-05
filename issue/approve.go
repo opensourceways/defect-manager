@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-var committerInstance *committerCache
+var CommitterInstance *committerCache
 
 type ResContent struct {
 	Type string `json:"type"`
@@ -30,20 +30,37 @@ type ResCommitter struct {
 
 type committerCache struct {
 	committersOfRepo map[string][]string
-	CacheAt          string
+	assignerOfRepo   map[string]string
+	//EnterpriseId     int32
+	CacheAt string
 }
 
 func InitCommitterInstance() {
-	committerInstance = &committerCache{
+	CommitterInstance = &committerCache{
 		committersOfRepo: make(map[string][]string),
+		assignerOfRepo:   make(map[string]string),
 	}
 }
 
-func (c *committerCache) isCommitter(pathWithNamespace, user string) bool {
-	if len(c.committersOfRepo) == 0 || c.CacheAt != time.Now().Format("20060102") {
-		c.initCommitterCache()
+func (c *committerCache) listCommitter(pathWithNamespace string) []string {
+	v, ok := c.committersOfRepo[pathWithNamespace]
+	if !ok {
+		return []string{}
 	}
 
+	return v
+}
+
+func (c *committerCache) getAssigner(pathWithNamespace string) string {
+	v, ok := c.assignerOfRepo[pathWithNamespace]
+	if !ok {
+		return ""
+	}
+
+	return v
+}
+
+func (c *committerCache) isCommitter(pathWithNamespace, user string) bool {
 	v, ok := c.committersOfRepo[pathWithNamespace]
 	if !ok {
 		return false
@@ -54,9 +71,10 @@ func (c *committerCache) isCommitter(pathWithNamespace, user string) bool {
 	return set.Has(user)
 }
 
-func (c *committerCache) initCommitterCache() {
+func (c *committerCache) InitCommitterCache() {
 	cli := utils.NewHttpClient(3)
-	for _, sig := range c.getSig() {
+	sigs := c.getSig()
+	for _, sig := range sigs {
 		// Accessing too often can cause 503 errors
 		time.Sleep(time.Millisecond * 200)
 
@@ -79,16 +97,31 @@ func (c *committerCache) initCommitterCache() {
 			continue
 		}
 
+		var sigAssigner string
+		if len(res.Data.Maintainers) > 0 {
+			sigAssigner = res.Data.Maintainers[0]
+		}
+
 		for _, v := range res.Data.CommitterDetails {
 			c.committersOfRepo[v.Repo] = append(res.Data.Maintainers, v.GiteeId...)
+
+			var assigner string
+			if len(v.GiteeId) > 0 {
+				assigner = v.GiteeId[0]
+			} else {
+				assigner = sigAssigner
+			}
+
+			c.assignerOfRepo[v.Repo] = assigner
 		}
+
 	}
 
 	c.CacheAt = time.Now().Format("20060102")
 }
 
 func (c *committerCache) getSig() []string {
-	url := "https://gitee.com/api/v5/repos/openeuler/community/contents/sig"
+	url := "https://gitee.com/api/v5/repos/openeuler/community/contents/sig?access_token"
 	request, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		logrus.Errorf("new request of sig url error: %s ", err.Error())

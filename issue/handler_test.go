@@ -3,7 +3,6 @@ package issue
 import (
 	"errors"
 	"testing"
-	"time"
 
 	sdk "github.com/opensourceways/go-gitee/gitee"
 
@@ -37,6 +36,10 @@ func TestIssueClosed(t *testing.T) {
 type cliTest struct {
 }
 
+func (t cliTest) UpdateIssue(owner, number string, param sdk.IssueUpdateParam) (sdk.Issue, error) {
+	return sdk.Issue{}, nil
+}
+
 func (t cliTest) CreateIssueComment(org, repo string, number string, comment string) error {
 	return errors.New("缺陷数据未收集完成，重新打开issue")
 }
@@ -57,6 +60,10 @@ func (t cliTest) GetBot() (sdk.User, error) {
 	return sdk.User{}, nil
 }
 
+func (t cliTest) GetIssue(org, repo, number string) (sdk.Issue, error) {
+	return sdk.Issue{}, nil
+}
+
 type serviceTest struct {
 }
 
@@ -68,7 +75,7 @@ func (t serviceTest) SaveDefects(app.CmdToSaveDefect) error {
 	return nil
 }
 
-func (t serviceTest) CollectDefects(time time.Time) ([]app.CollectDefectsDTO, error) {
+func (t serviceTest) CollectDefects(string) ([]app.CollectDefectsDTO, error) {
 	return nil, nil
 }
 

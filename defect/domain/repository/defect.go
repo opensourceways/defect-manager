@@ -1,18 +1,15 @@
 package repository
 
 import (
-	"time"
-
 	"github.com/opensourceways/defect-manager/defect/domain/dp"
 
 	"github.com/opensourceways/defect-manager/defect/domain"
 )
 
 type OptToFindDefects struct {
-	BeginTime time.Time
-	Org       string
-	Number    []string
-	Status    dp.IssueStatus
+	Org    string
+	Number []string
+	Status dp.IssueStatus
 }
 
 type DefectRepository interface {

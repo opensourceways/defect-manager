@@ -15,6 +15,7 @@ import (
 	"github.com/opensourceways/defect-manager/defect/domain/obs"
 	"github.com/opensourceways/defect-manager/defect/domain/producttree"
 	"github.com/opensourceways/defect-manager/defect/domain/repository"
+	"github.com/opensourceways/defect-manager/defect/infrastructure/producttreeimpl"
 	"github.com/opensourceways/defect-manager/utils"
 )
 
@@ -23,7 +24,7 @@ const uploadedDefect = "update_defect.txt"
 type DefectService interface {
 	IsDefectExist(*domain.Issue) (bool, error)
 	SaveDefects(CmdToSaveDefect) error
-	CollectDefects(time time.Time) ([]CollectDefectsDTO, error)
+	CollectDefects(string) ([]CollectDefectsDTO, error)
 	GenerateBulletins([]string) error
 }
 
@@ -68,15 +69,37 @@ func (d defectService) SaveDefects(cmd CmdToSaveDefect) error {
 	}
 }
 
-func (d defectService) CollectDefects(date time.Time) (dto []CollectDefectsDTO, err error) {
+func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, err error) {
 	opt := repository.OptToFindDefects{
-		BeginTime: date,
-		Status:    dp.IssueStatusClosed,
+		Status: dp.IssueStatusClosed,
 	}
 
 	defects, err := d.repo.FindDefects(opt)
 	if err != nil || len(defects) == 0 {
 		return
+	}
+
+	var versionForDefects domain.Defects
+	for _, d := range defects {
+		for _, av := range d.AffectedVersion {
+			if av.String() == version {
+				versionForDefects = append(versionForDefects, d)
+			}
+		}
+	}
+
+	logrus.Infof("versionForDefects : %s", versionForDefects)
+
+	d.productTree.InitCache()
+	defer d.productTree.CleanCache()
+
+	var rpmForDefects domain.Defects
+	instance := producttreeimpl.Instance()
+	for _, vdf := range versionForDefects {
+		rpmOfComponent := instance.ParseRPM(vdf.CreatedAt, vdf.Component, vdf.AffectedVersion[0].String())
+		if rpmOfComponent != "" {
+			rpmForDefects = append(rpmForDefects, vdf)
+		}
 	}
 
 	publishedNum, err := d.backend.PublishedDefects()
@@ -86,9 +109,9 @@ func (d defectService) CollectDefects(date time.Time) (dto []CollectDefectsDTO, 
 
 	var unpublishedDefects domain.Defects
 	ps := sets.NewString(publishedNum...)
-	for _, defect := range defects {
-		if _, ok := ps[defect.Issue.Number]; !ok {
-			unpublishedDefects = append(unpublishedDefects, defect)
+	for _, rfd := range rpmForDefects {
+		if _, ok := ps[rfd.Issue.Number]; !ok {
+			unpublishedDefects = append(unpublishedDefects, rfd)
 		}
 	}
 
@@ -122,7 +145,7 @@ func (d defectService) GenerateBulletins(number []string) error {
 		maxIdentification++
 		b.Identification = fmt.Sprintf("cvrf-openEuler-BA-%d-%d", utils.Year(), maxIdentification)
 
-		b.ProductTree, err = d.productTree.GetTree(b.Component, b.AffectedVersion)
+		b.ProductTree, err = d.productTree.GetTree(b.Defects[0].CreatedAt, b.Component, b.AffectedVersion)
 		if err != nil {
 			logrus.Errorf("%s, component %s, get productTree error: %s", b.Identification, b.Component, err.Error())
 

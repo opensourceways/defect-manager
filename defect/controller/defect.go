@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"time"
-
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/opensourceways/server-common-lib/controller"
@@ -29,19 +27,14 @@ func AddRouteForDefectController(r *gin.RouterGroup, s app.DefectService) {
 // @Description collect information of some defects
 // @Tags  Defect
 // @Accept json
-// @Param	date  query string	 true	"collect defects after the date"
+// @Param	version  query string	 true	"collect defects of the version"
 // @Success 200 {object} []app.CollectDefectsDTO
 // @Failure 400 {object} string
 // @Router /v1/defect [get]
 func (ctl DefectController) Collect(ctx *gin.Context) {
-	date, err := time.Parse("2006-01-02", ctx.Query("date"))
-	if err != nil {
-		controller.SendBadRequestBody(ctx, err)
+	version := ctx.Query("version")
 
-		return
-	}
-
-	if v, err := ctl.service.CollectDefects(date); err != nil {
+	if v, err := ctl.service.CollectDefects(version); err != nil {
 		controller.SendFailedResp(ctx, "", err)
 	} else {
 		controller.SendRespOfGet(ctx, v)

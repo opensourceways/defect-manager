@@ -25,6 +25,7 @@ type defectDO struct {
 	GuidanceURL      string         `gorm:"column:guidance_url"`
 	Influence        string         `gorm:"column:influence"`
 	SeverityLevel    string         `gorm:"column:severity_level"`
+	RootCause        string         `gorm:"column:root_cause"`
 	AffectedVersion  pq.StringArray `gorm:"column:affected_version;type:text[];default:'{}'"`
 	ABI              string         `gorm:"column:abi"`
 	CreatedAt        time.Time      `gorm:"column:created_at;<-:create;index"`
@@ -47,12 +48,14 @@ func (impl defectImpl) toDefectDO(defect *domain.Defect) defectDO {
 		ComponentVersion: defect.ComponentVersion,
 		SystemVersion:    defect.SystemVersion.String(),
 		Description:      defect.Description,
-		ReferenceURL:     defect.ReferenceURL.URL(),
-		GuidanceURL:      defect.GuidanceURL.URL(),
+		ReferenceURL:     "",
+		GuidanceURL:      "",
 		Influence:        defect.Influence,
 		SeverityLevel:    defect.SeverityLevel.String(),
-		AffectedVersion:  toStringArray(defect.AffectedVersion),
-		ABI:              defect.ABI,
+		RootCause:        defect.RootCause,
+
+		AffectedVersion: toStringArray(defect.AffectedVersion),
+		ABI:             defect.ABI,
 	}
 }
 
@@ -77,8 +80,6 @@ func toSystemVersion(arr pq.StringArray) []dp.SystemVersion {
 
 func (d defectDO) toDefect() domain.Defect {
 	version, _ := dp.NewSystemVersion(d.SystemVersion)
-	referenceURL, _ := dp.NewURL(d.ReferenceURL)
-	guidanceURL, _ := dp.NewURL(d.GuidanceURL)
 	severityLevel, _ := dp.NewSeverityLevel(d.SeverityLevel)
 	status, _ := dp.NewIssueStatus(d.Status)
 
@@ -88,8 +89,8 @@ func (d defectDO) toDefect() domain.Defect {
 		ComponentVersion: d.ComponentVersion,
 		SystemVersion:    version,
 		Description:      d.Description,
-		ReferenceURL:     referenceURL,
-		GuidanceURL:      guidanceURL,
+		ReferenceURL:     nil,
+		GuidanceURL:      nil,
 		Influence:        d.Influence,
 		SeverityLevel:    severityLevel,
 		AffectedVersion:  toSystemVersion(d.AffectedVersion),
@@ -101,5 +102,7 @@ func (d defectDO) toDefect() domain.Defect {
 			Repo:   d.Repo,
 			Status: status,
 		},
+		CreatedAt: d.CreatedAt,
+		UpdatedAt: d.UpdatedAt,
 	}
 }

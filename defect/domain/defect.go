@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"time"
+
 	"github.com/opensourceways/defect-manager/defect/domain/dp"
 
 	"github.com/opensourceways/defect-manager/utils"
@@ -24,9 +26,12 @@ type Defect struct {
 	GuidanceURL      dp.URL
 	Influence        string
 	SeverityLevel    dp.SeverityLevel
+	RootCause        string
 	AffectedVersion  []dp.SystemVersion
 	ABI              string
 	Issue            Issue
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 type Issue struct {

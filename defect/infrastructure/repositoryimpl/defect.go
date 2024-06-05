@@ -74,7 +74,7 @@ func (impl defectImpl) SaveDefect(defect *domain.Defect) error {
 
 func (impl defectImpl) FindDefects(opt repository.OptToFindDefects) (ds domain.Defects, err error) {
 	var filter []postgres.ColumnFilter
-	filter = append(filter, postgres.NewGreaterFilter(fieldCreatedAt, opt.BeginTime))
+	//filter = append(filter, postgres.NewGreaterFilter(fieldCreatedAt, opt.BeginTime))
 
 	if len(opt.Number) > 0 {
 		filter = append(filter, postgres.NewInFilter(fieldNumber, opt.Number))
