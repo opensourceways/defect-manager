@@ -9,6 +9,8 @@ import (
 	"github.com/opensourceways/server-common-lib/utils"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	defectUtils "github.com/opensourceways/defect-manager/utils"
 )
 
 var CommitterInstance *committerCache
@@ -48,7 +50,7 @@ func (c *committerCache) listCommitter(pathWithNamespace string) []string {
 		return []string{}
 	}
 
-	return v
+	return defectUtils.RemoveDuplicates(v)
 }
 
 func (c *committerCache) getAssigner(pathWithNamespace string) string {

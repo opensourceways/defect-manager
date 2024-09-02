@@ -17,23 +17,17 @@ const (
 	fixedLabel      = "DEFECT/FIXED"
 	unFixedLabel    = "DEFECT/UNFIXED"
 
-	itemDescription                   = "description"
-	itemOS                            = "os"
-	itemKernel                        = "kernel"
-	itemComponents                    = "components"
-	itemProblemReproductionSteps      = "problemReproductionSteps"
-	itemTitleDescription              = "descriptionTitle"
-	itemTitleOS                       = "osTitle"
-	itemTitleKernel                   = "kernelTitle"
-	itemTitleComponents               = "componentsTitle"
-	itemTitleProblemReproductionSteps = "problemReproductionStepsTitle"
-	itemReferenceAndGuidanceUrl       = "referenceAndGuidanceUrl"
-	itemInfluence                     = "influence"
-	itemSeverityLevel                 = "severityLevel"
-	itemRootCause                     = "rootCause"
-	itemSelfTestResult                = "selfTestResult"
-	itemAffectedVersion               = "affectedVersion"
-	itemAbi                           = "abi"
+	itemDescription              = "description"
+	itemOS                       = "os"
+	itemKernel                   = "kernel"
+	itemComponents               = "components"
+	itemProblemReproductionSteps = "problemReproductionSteps"
+	itemReferenceAndGuidanceUrl  = "referenceAndGuidanceUrl"
+	itemInfluence                = "influence"
+	itemSeverityLevel            = "severityLevel"
+	itemRootCause                = "rootCause"
+	itemAffectedVersion          = "affectedVersion"
+	itemAbi                      = "abi"
 
 	severityLevelLow      = "Low"
 	severityLevelModerate = "Moderate"
@@ -65,42 +59,30 @@ const (
 
 var (
 	itemName = map[string]string{
-		itemDescription:                   "缺陷描述",
-		itemOS:                            "缺陷所属的os版本",
-		itemKernel:                        "内核版本",
-		itemComponents:                    "缺陷所属软件及版本号",
-		itemProblemReproductionSteps:      "问题复现步骤",
-		itemTitleDescription:              "缺陷描述",
-		itemTitleOS:                       "缺陷所属的os版本",
-		itemTitleKernel:                   "内核版本",
-		itemTitleComponents:               "缺陷所属软件及版本号",
-		itemTitleProblemReproductionSteps: "问题复现步骤",
-		itemReferenceAndGuidanceUrl:       "详情及分析指导参考链接",
-		itemInfluence:                     "影响性分析说明",
-		itemSeverityLevel:                 "缺陷严重等级",
-		itemRootCause:                     "缺陷根因定位",
-		itemSelfTestResult:                "开发自验结果",
-		itemAffectedVersion:               "受影响版本",
-		itemAbi:                           "abi",
+		itemDescription:              "缺陷描述",
+		itemOS:                       "缺陷所属的os版本",
+		itemKernel:                   "内核版本",
+		itemComponents:               "缺陷所属软件及版本号",
+		itemProblemReproductionSteps: "问题复现步骤",
+		itemReferenceAndGuidanceUrl:  "详情及分析指导参考链接",
+		itemInfluence:                "影响性分析说明",
+		itemSeverityLevel:            "缺陷严重等级",
+		itemRootCause:                "缺陷根因说明",
+		itemAffectedVersion:          "受影响版本",
+		itemAbi:                      "abi",
 	}
 
 	regexpOfItems = map[string]*regexp.Regexp{
-		itemDescription:                   regexp.MustCompile(`(缺陷描述)[】][(（]必填[)）][:：]请补充详细的缺陷问题现象描述\*\*([\s\S]*?)\*\*一、缺陷信息`),
-		itemOS:                            regexp.MustCompile(`(缺陷所属的os版本)[】][(（]必填，如openEuler-22.03-LTS，参考命令"cat /etc/os-release"结果[)）]\*\*([\s\S]*?)\*\*【内核版本`),
-		itemKernel:                        regexp.MustCompile(`(内核版本)[】][(（]必填，如kernel-5.10.0-60.138.0.165，参考命令"uname -r"结果[)）]\*\*([\s\S]*?)\*\*【缺陷所属软件及版本号`),
-		itemComponents:                    regexp.MustCompile(`(缺陷所属软件及版本号)[】][(（]必填，如kernel-5.10.0-60.138.0.165，参考命令"rpm -q 包名"结果[)）]\*\*([\s\S]*?)\*\*【环境信息`),
-		itemProblemReproductionSteps:      regexp.MustCompile(`(问题复现步骤)[】][(（]必填[)）][:：]请描述具体的操作步骤\*\*([\s\S]*?)\*\*【实际结果`),
-		itemTitleDescription:              regexp.MustCompile(`(缺陷描述)[】][(（]必填[)）][:：]请补充详细的缺陷问题现象描述([\s\S]*?)\*\*一、缺陷信息`),
-		itemTitleOS:                       regexp.MustCompile(`(缺陷所属的os版本)[】][(（]必填，如openEuler-22.03-LTS，参考命令"cat /etc/os-release"结果[)）]([\s\S]*?)### 【内核版本`),
-		itemTitleKernel:                   regexp.MustCompile(`(内核版本)[】][(（]必填，如kernel-5.10.0-60.138.0.165，参考命令"uname -r"结果[)）]([\s\S]*?)### 【缺陷所属软件及版本号`),
-		itemTitleComponents:               regexp.MustCompile(`(缺陷所属软件及版本号)[】][(（]必填，如kernel-5.10.0-60.138.0.165，参考命令"rpm -q 包名"结果[)）]([\s\S]*?)\*\*【环境信息`),
-		itemTitleProblemReproductionSteps: regexp.MustCompile(`(问题复现步骤)[】][(（]必填[)）][:：]请描述具体的操作步骤([\s\S]*?)\*\*【实际结果`),
-		itemInfluence:                     regexp.MustCompile(`(影响性分析说明)[:：]([\s\S]*?)缺陷严重等级`),
-		itemSeverityLevel:                 regexp.MustCompile(`(缺陷严重等级)[:：]\(Critical/High/Moderate/Low\)([\s\S]*?)缺陷根因定位`),
-		itemRootCause:                     regexp.MustCompile(`(缺陷根因定位)[:：]([\s\S]*?)开发自验结果`),
-		itemSelfTestResult:                regexp.MustCompile(`(开发自验结果)[(（]选填[)）][:：]([\s\S]*?)受影响版本排查`),
-		itemAffectedVersion:               regexp.MustCompile(`(受影响版本排查)\(受影响/不受影响\)[:：]([\s\S]*?)abi变化`),
-		itemAbi:                           regexp.MustCompile(`(abi变化)\(是/否\)[:：]([\s\S]*?)$`),
+		itemDescription:              regexp.MustCompile(`(缺陷描述)[】][:：]请补充详细的缺陷问题现象描述\*\*([\s\S]*?)\*\*一、缺陷信息`),
+		itemOS:                       regexp.MustCompile(`(缺陷所属的os版本)[】][(（]如openEuler-22.03-LTS，参考命令"cat /etc/os-release"结果[)）]\*\*([\s\S]*?)\*\*【内核版本`),
+		itemKernel:                   regexp.MustCompile(`(内核版本)[】][(（]如kernel-5.10.0-60.138.0.165，参考命令"uname -r"结果[)）]\*\*([\s\S]*?)\*\*【缺陷所属软件及版本号`),
+		itemComponents:               regexp.MustCompile(`(缺陷所属软件及版本号)[】][(（]如kernel-5.10.0-60.138.0.165，参考命令"rpm -q 包名"结果[)）]\*\*([\s\S]*?)\*\*【环境信息`),
+		itemProblemReproductionSteps: regexp.MustCompile(`(问题复现步骤)[】][:：]请描述具体的操作步骤\*\*([\s\S]*?)\*\*【实际结果`),
+		itemInfluence:                regexp.MustCompile(`(影响性分析说明)[:：]([\s\S]*?)缺陷严重等级`),
+		itemSeverityLevel:            regexp.MustCompile(`(缺陷严重等级)[:：]\(Critical/High/Moderate/Low\)([\s\S]*?)缺陷根因说明`),
+		itemRootCause:                regexp.MustCompile(`(缺陷根因说明)[:：]([\s\S]*?)受影响版本排查`),
+		itemAffectedVersion:          regexp.MustCompile(`(受影响版本排查)\(受影响/不受影响\)[:：]([\s\S]*?)abi变化`),
+		itemAbi:                      regexp.MustCompile(`(abi变化)\(是/否\)[:：]([\s\S]*?)$`),
 	}
 
 	sortOfIssueItems = []string{
@@ -111,19 +93,10 @@ var (
 		itemProblemReproductionSteps,
 	}
 
-	sortOfIssueTitleItems = []string{
-		itemTitleDescription,
-		itemTitleOS,
-		itemTitleKernel,
-		itemTitleComponents,
-		itemTitleProblemReproductionSteps,
-	}
-
 	sortOfCommentItems = []string{
 		itemInfluence,
 		itemSeverityLevel,
 		itemRootCause,
-		itemSelfTestResult,
 		itemAffectedVersion,
 		itemAbi,
 	}
@@ -152,7 +125,6 @@ type parseCommentResult struct {
 	Influence        string
 	SeverityLevel    string
 	RootCause        string
-	SelfTestResult   string
 	AllVersionResult []string
 	AllAbiResult     []string
 	AffectedVersion  []string
@@ -161,9 +133,9 @@ type parseCommentResult struct {
 
 func (impl eventHandler) parseIssue(assigner *sdk.UserHook, body string) (parseIssueResult, error) {
 	var parseIssueParam = sortOfIssueItems
-	if strings.Contains(body, "###") {
+	/* 	if strings.Contains(body, "###") {
 		parseIssueParam = sortOfIssueTitleItems
-	}
+	} */
 
 	result, err := impl.parse(parseIssueParam, assigner, body)
 	if err != nil {
@@ -210,10 +182,6 @@ func (impl eventHandler) parseComment(assigner *sdk.UserHook, body string) (pars
 
 	if v, ok := result[itemRootCause]; ok {
 		ret.RootCause = v
-	}
-
-	if v, ok := result[itemSelfTestResult]; ok {
-		ret.SelfTestResult = v
 	}
 
 	if v, ok := result[itemAffectedVersion]; ok {
@@ -265,11 +233,6 @@ func (impl eventHandler) parse(items []string, assigner *sdk.UserHook, body stri
 				mr.Add(fmt.Sprintf("%s %s=>不允许为空", assign, itemName[item]))
 				continue
 			}
-
-			if item != itemSelfTestResult && item != itemRootCause {
-				mr.Add(fmt.Sprintf("%s %s=>不允许为空", assign, itemName[item]))
-				continue
-			}
 		}
 
 		if _, ok := noTrimItem[item]; ok {
@@ -288,17 +251,7 @@ func (impl eventHandler) parse(items []string, assigner *sdk.UserHook, body stri
 			if !maintainVersion.Has(parseResult[item]) {
 				mr.Add(genErr(itemName[itemOS]))
 			}
-		case itemTitleOS:
-			maintainVersion := sets.NewString(impl.cfg.MaintainVersion...)
-			if !maintainVersion.Has(parseResult[item]) {
-				mr.Add(genErr(itemName[itemOS]))
-			}
 		case itemComponents:
-			split := strings.Split(parseResult[item], "-")
-			if len(split) < 2 {
-				mr.Add(genErr(itemName[itemComponents]))
-			}
-		case itemTitleComponents:
 			split := strings.Split(parseResult[item], "-")
 			if len(split) < 2 {
 				mr.Add(genErr(itemName[itemComponents]))

@@ -79,7 +79,8 @@ func (impl eventHandler) HandleIssueEvent(e *sdk.IssueEvent) error {
 	switch e.Issue.StateName {
 	case StatusFinished:
 		return impl.handleIssueClosed(e)
-
+	case StatusAccept:
+		return impl.handleIssueClosed(e)
 	case StatusTodo:
 		return impl.handleIssueOpen(e)
 
@@ -108,8 +109,9 @@ func (impl eventHandler) handleIssueReject(e *sdk.IssueEvent) error {
 	}
 
 	for i := len(comments) - 1; i >= 0; i-- {
-		if strings.Contains(comments[i].Body, "/reason") && comments[i].User.Login != impl.botName {
-			newLabels := dealLabels(e.Issue.Labels, fixedLabel)
+		if strings.Contains(comments[i].Body, "/reason") && comments[i].User.Login != impl.botName &&
+			CommitterInstance.isCommitter(e.Repository.PathWithNamespace, comments[i].User.Login) {
+			newLabels := dealLabels(e.Issue.Labels, "")
 			if _, err := impl.cli.UpdateIssue(e.Project.Namespace, e.Issue.Number,
 				sdk.IssueUpdateParam{Labels: newLabels, Repo: e.Project.Name}); err != nil {
 				return fmt.Errorf("update issue error: %s", err.Error())
@@ -143,7 +145,8 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 
 	issueInfo, err := impl.parseIssue(e.Sender, e.Issue.Body)
 	if err != nil {
-		return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
+		//return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
+		logrus.Errorf("parse issue error: %s", err.Error())
 	}
 
 	comment := impl.getAnalysisComment(e)
@@ -154,7 +157,7 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 
 		logrus.Infof("reopen issue %s %s", e.Project.PathWithNamespace, e.Issue.Number)
 
-		return commentIssue(fmt.Sprintf("%s 未对受影响版本排查/abi变化进行分析，重新打开issue", e.Sender.UserName))
+		return commentIssue(fmt.Sprintf("@%s 未对受影响版本排查/abi变化进行分析，重新打开issue", e.Sender.UserName))
 	}
 
 	commentInfo, err := impl.parseComment(e.Sender, comment)
@@ -274,7 +277,8 @@ func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
 	if strings.Contains(e.Comment.Body, influence) {
 		issueInfo, err := impl.parseIssue(e.Comment.User, e.Issue.Body)
 		if err != nil {
-			return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
+			logrus.Errorf("parse issue error: %s", err.Error())
+			//return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
 		}
 
 		commentInfo, err := impl.parseComment(e.Comment.User, e.Comment.Body)
@@ -443,26 +447,30 @@ func (impl eventHandler) checkIssue(cp checkIssueParam) error {
 		issueNumber: cp.issueNumber,
 	}
 
-	newbody, err := impl.dealIssue(dp)
+	_, err := impl.dealIssue(dp)
 	if err != nil {
 		return fmt.Errorf("deal issue error: %s", err.Error())
 	}
 
-	if _, err := impl.parseIssue(cp.issueUser, newbody); err != nil {
-		return impl.cli.CreateIssueComment(cp.namespace,
-			cp.name, cp.issueNumber, strings.Replace(err.Error(), ". ", "\n\n", -1),
-		)
-	}
-
-	issueUpdateParam := modifyIssueBodyStyle(cp.labels, newbody, cp.name)
+	issueUpdateParam := modifyIssueBodyStyle(cp.labels, cp.name)
 
 	if _, err := impl.cli.UpdateIssue(cp.namespace, cp.issueNumber, issueUpdateParam); err != nil {
 		return fmt.Errorf("update issue error: %s", err.Error())
 	}
 
-	if err := impl.cli.CreateIssueComment(cp.namespace, cp.name, cp.issueNumber, fmt.Sprintf(issueCheckSuccess, cp.issueUser.UserName)); err != nil {
-		return fmt.Errorf("create issue comment error: %s", err.Error())
+	/*  	if _, err := impl.parseIssue(cp.issueUser, newbody); err != nil {
+		return impl.cli.CreateIssueComment(cp.namespace,
+			cp.name, cp.issueNumber, strings.Replace(err.Error(), ". ", "\n\n", -1),
+		)
 	}
+
+	if _, err := impl.cli.UpdateIssue(cp.namespace, cp.issueNumber, issueUpdateParam); err != nil {
+		return fmt.Errorf("update issue error: %s", err.Error())
+	} */
+
+	/* 	if err := impl.cli.CreateIssueComment(cp.namespace, cp.name, cp.issueNumber, fmt.Sprintf(issueCheckSuccess, cp.issueUser.UserName)); err != nil {
+		return fmt.Errorf("create issue comment error: %s", err.Error())
+	} */
 
 	dl := deadLineParam{
 		name:         cp.name,

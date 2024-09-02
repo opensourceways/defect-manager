@@ -14,9 +14,7 @@ const feedback = `
 
 缺陷严重等级:(Critical/High/Moderate/Low)
 
-缺陷根因定位:
-
-开发自验结果(选填):
+缺陷根因说明:
 
 受影响版本排查(受影响/不受影响):
 %v
@@ -29,9 +27,7 @@ const commentFeedback = `
 %v
 缺陷严重等级:(Critical/High/Moderate/Low)
 %v
-缺陷根因定位:
-%v
-开发自验结果(选填):
+缺陷根因说明:
 %v
 受影响版本排查(受影响/不受影响):
 %v
@@ -53,26 +49,24 @@ const commentCopyValue = `
 **1. 当前issue受影响的分支提交pr时, 须在pr描述中填写当前issue编号进行关联, 否则无法关闭当前issue;**
 **2. 模板内容需要填写完整, 无论是受影响或者不受影响都需要填写完整内容,未引入的分支不需要填写, 否则无法关闭当前issue;**
 **3. 以下为模板中需要填写完整的内容, 请复制到评论区回复, 注: 内容的标题名称(影响性分析说明, 缺陷严重等级, 受影响版本排查(受影响/不受影响), 修复是否涉及abi变化(是/否))不能省略,省略后defect-manager将无法正常解析填写内容.**
-**评论区使用指令说明:**
+**评论区可能使用到的指令说明:**
 | 指令  | 指令说明 | 使用权限 |
 |:--:|:--:|---------|
-|/check-issue|校验issue格式|不限|
+|/check-issue|触发defect-manager校验|不限|
 |/reason xxx|/reason +挂起或取消条件|不限|
 ************************************************************************
 影响性分析说明: 
 
 缺陷严重等级:(Critical/High/Moderate/Low)
 
-缺陷根因定位:
-
-开发自验结果(选填):
+缺陷根因说明:
 
 受影响版本排查(受影响/不受影响): 
 %v
 abi变化(是/否):
 %v
 -----------------------------------------------------------------------
-issue处理具体操作请参考: 
+缺陷issue处理具体操作请参考: 
 %v
 pr关联issue具体操作请参考:
 %v
@@ -107,9 +101,8 @@ const tb2 = `
 |已分析|1.影响性分析说明|%v|
 |已分析|2.缺陷严重等级|%v|
 |已分析|3.缺陷根因定位|%v|
-|已分析|4.开发自验结果|%v|
-|已分析|5.受影响版本排查|%v|
-|已分析|6.abi变化|%v|
+|已分析|4.受影响版本排查|%v|
+|已分析|5.abi变化|%v|
 
 **请确认分析内容的准确性，确认无误后，您可以进行后续步骤，否则您可以继续分析**
 `
@@ -124,10 +117,6 @@ const reOpenComment = `
 const commentVersionTip = `
 %v 请确认分支: %v.
 **请确认%v是否填写完整，否则将无法关闭当前issue.**
-`
-
-const issueCheckSuccess = `
-@%s issue 校验成功
 `
 
 const (
@@ -172,7 +161,7 @@ func commentTemplate(maintainVersion, committerList []string) string {
 		assList = append(assList, "@"+v)
 	}
 
-	assigneeStr = strings.Join(assList, ",")
+	assigneeStr = strings.Join(assList, " , ")
 
 	return fmt.Sprintf(commentCopyValue, assigneeStr, affectedVersion, affectedVersion, commentCmd, PrIssueLink)
 }
@@ -187,18 +176,6 @@ func analysisComplete(assigner *sdk.UserHook, anlysisComment parseCommentResult)
 	}
 
 	assigning := "@" + assigner.UserName
-	if anlysisComment.SelfTestResult != "" {
-		return fmt.Sprintf(
-			tb2,
-			assigning,
-			strings.ReplaceAll(anlysisComment.Influence, "\r\n", ""),
-			anlysisComment.SeverityLevel,
-			anlysisComment.RootCause,
-			anlysisComment.SelfTestResult,
-			strings.Join(anlysisComment.AllVersionResult, ","),
-			strings.Join(anlysisComment.AllAbiResult, ","),
-		)
-	}
 
 	return fmt.Sprintf(
 		tb1,
@@ -211,14 +188,10 @@ func analysisComplete(assigner *sdk.UserHook, anlysisComment parseCommentResult)
 	)
 }
 
-func modifyIssueBodyStyle(labels []sdk.LabelHook, body, name string) sdk.IssueUpdateParam {
-	combinedRegex := regexp.MustCompile(`(?m)^### (.*?)(\r?\n)`)
-	newBody := combinedRegex.ReplaceAllString(body, "**$1**$2")
-
+func modifyIssueBodyStyle(labels []sdk.LabelHook, name string) sdk.IssueUpdateParam {
 	newLabels := dealLabels(labels, unFixedLabel)
 
 	return sdk.IssueUpdateParam{
-		Body:   newBody,
 		Labels: newLabels,
 		Repo:   name,
 	}
@@ -234,12 +207,12 @@ func generateAnalysisFeedbackBody(body string, maintainVersion []string) string 
 }
 
 func generateanalysisCommentFeedbackBody(body string, comment parseCommentResult) string {
-	regItemFirstPartDefectInfo := regexp.MustCompile(`(\*\*【缺陷描述】（必填）：请补充详细的缺陷问题现象描述)([\s\S]*?)\*\*二、缺陷分析结构反馈\*\*`)
+	regItemFirstPartDefectInfo := regexp.MustCompile(`(\*\*【缺陷描述】：请补充详细的缺陷问题现象描述)([\s\S]*?)\*\*二、缺陷分析结构反馈\*\*`)
 	match := regItemFirstPartDefectInfo.FindAllStringSubmatch(body, -1)
 	matchBody := match[regMatchResult][regMatchResult]
 
 	analysisBody := fmt.Sprintf(commentFeedback, comment.Influence,
-		comment.SeverityLevel, comment.RootCause, comment.SelfTestResult,
+		comment.SeverityLevel, comment.RootCause,
 		strings.Join(comment.AllVersionResult, "\n"), strings.Join(comment.AllAbiResult, "\n"))
 
 	return matchBody + analysisBody

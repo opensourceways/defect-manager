@@ -69,3 +69,17 @@ func (e *MultiError) Err() error {
 	}
 	return errors.New(strings.Join(e.es, ". "))
 }
+
+func RemoveDuplicates(strSlice []string) []string {
+	uniqueMap := make(map[string]bool)
+	result := []string{}
+
+	for _, str := range strSlice {
+		if !uniqueMap[str] {
+			uniqueMap[str] = true
+			result = append(result, str)
+		}
+	}
+
+	return result
+}
