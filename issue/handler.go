@@ -66,12 +66,15 @@ type eventHandler struct {
 }
 
 func (impl eventHandler) HandleIssueEvent(e *sdk.IssueEvent) error {
+	logrus.Infof("handle issue event: %+v", e)
 	if e.Issue.TypeName != impl.cfg.IssueType {
+		logrus.Infof("not support issue type: %s", e.Issue.TypeName)
 		return nil
 	}
 
 	for _, v := range impl.cfg.DevelopVersion {
 		if strings.Contains(e.Issue.Body, v) {
+			logrus.Infof("found develop version: %s", v)
 			return nil
 		}
 	}
@@ -224,6 +227,7 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 
 func (impl eventHandler) handleIssueOpen(e *sdk.IssueEvent) error {
 	if *e.Action == "assign" {
+		logrus.Infof("assign issue %s %s", e.Project.PathWithNamespace, e.Issue.Number)
 		return nil
 	}
 
