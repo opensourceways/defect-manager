@@ -233,6 +233,9 @@ func (impl eventHandler) parse(items []string, assigner *sdk.UserHook, body stri
 				mr.Add(fmt.Sprintf("%s %s=>不允许为空", assign, itemName[item]))
 				continue
 			}
+
+			mr.Add(fmt.Sprintf("%s %s=>不允许为空", assign, itemName[item]))
+			continue
 		}
 
 		if _, ok := noTrimItem[item]; ok {

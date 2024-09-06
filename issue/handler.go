@@ -109,8 +109,7 @@ func (impl eventHandler) handleIssueReject(e *sdk.IssueEvent) error {
 	}
 
 	for i := len(comments) - 1; i >= 0; i-- {
-		if strings.Contains(comments[i].Body, "/reason") && comments[i].User.Login != impl.botName &&
-			CommitterInstance.isCommitter(e.Repository.PathWithNamespace, comments[i].User.Login) {
+		if strings.Contains(comments[i].Body, "/reason") && comments[i].User.Login != impl.botName {
 			newLabels := dealLabels(e.Issue.Labels, "")
 			if _, err := impl.cli.UpdateIssue(e.Project.Namespace, e.Issue.Number,
 				sdk.IssueUpdateParam{Labels: newLabels, Repo: e.Project.Name}); err != nil {
@@ -324,8 +323,7 @@ func (impl eventHandler) getAnalysisComment(e *sdk.IssueEvent) string {
 
 	for i := len(comments) - 1; i >= 0; i-- {
 		if strings.Contains(comments[i].Body, influence) &&
-			comments[i].User.Login != impl.botName &&
-			CommitterInstance.isCommitter(e.Repository.PathWithNamespace, comments[i].User.Login) {
+			comments[i].User.Login != impl.botName {
 			return comments[i].Body
 		}
 	}

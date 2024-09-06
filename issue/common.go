@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	sdk "github.com/opensourceways/go-gitee/gitee"
+	"github.com/sirupsen/logrus"
 )
 
 const feedback = `
@@ -207,13 +208,18 @@ func generateAnalysisFeedbackBody(body string, maintainVersion []string) string 
 }
 
 func generateanalysisCommentFeedbackBody(body string, comment parseCommentResult) string {
-	regItemFirstPartDefectInfo := regexp.MustCompile(`(\*\*【缺陷描述】：请补充详细的缺陷问题现象描述)([\s\S]*?)\*\*二、缺陷分析结构反馈\*\*`)
-	match := regItemFirstPartDefectInfo.FindAllStringSubmatch(body, -1)
-	matchBody := match[regMatchResult][regMatchResult]
-
 	analysisBody := fmt.Sprintf(commentFeedback, comment.Influence,
 		comment.SeverityLevel, comment.RootCause,
 		strings.Join(comment.AllVersionResult, "\n"), strings.Join(comment.AllAbiResult, "\n"))
+
+	regItemFirstPartDefectInfo := regexp.MustCompile(`(\*\*【缺陷描述】：请补充详细的缺陷问题现象描述)([\s\S]*?)\*\*二、缺陷分析结构反馈\*\*`)
+	match := regItemFirstPartDefectInfo.FindAllStringSubmatch(body, -1)
+	if len(match) == 0 && len(match[0]) == 0 {
+		logrus.Error("issue body not match, not find regItemFirstPartDefectInfo")
+		return body + analysisBody
+	}
+
+	matchBody := match[regMatchResult][regMatchResult]
 
 	return matchBody + analysisBody
 }
