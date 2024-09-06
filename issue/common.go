@@ -216,7 +216,7 @@ func generateanalysisCommentFeedbackBody(body string, comment parseCommentResult
 	match := regItemFirstPartDefectInfo.FindAllStringSubmatch(body, -1)
 	if len(match) == 0 || len(match[0]) == 0 {
 		logrus.Error("issue body not match, not find regItemFirstPartDefectInfo")
-		return body + analysisBody
+		return body
 	}
 
 	matchBody := match[regMatchResult][regMatchResult]
