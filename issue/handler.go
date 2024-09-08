@@ -161,6 +161,10 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 
 	commentInfo, err := impl.parseComment(e.Sender, comment)
 	if err != nil {
+		if err2 := impl.cli.ReopenIssue(e.Project.Namespace, e.Project.Name, e.Issue.Number); err2 != nil {
+			return fmt.Errorf("reopen issue error: %s", err2.Error())
+		}
+
 		return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
 	}
 
@@ -246,6 +250,12 @@ func (impl eventHandler) handleIssueOpen(e *sdk.IssueEvent) error {
 
 // || e.Comment.User.Login == impl.botName
 func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
+	for _, v := range impl.cfg.DevelopVersion {
+		if strings.Contains(e.Issue.Body, v) {
+			return nil
+		}
+	}
+
 	if !e.IsIssue() || e.Issue.TypeName != impl.cfg.IssueType ||
 		e.Issue.StateName == StatusFinished || e.Issue.StateName == StatusCancel ||
 		e.Issue.StateName == StatusSuspend || e.Comment.User.Login == impl.botName {

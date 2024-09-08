@@ -1,7 +1,7 @@
 package dp
 
 import (
-	"errors"
+	"github.com/sirupsen/logrus"
 )
 
 var MaintainVersion = make(map[SystemVersion]bool)
@@ -22,7 +22,8 @@ func NewSystemVersion(s string) (SystemVersion, error) {
 	// MaintainVersion is not used for validation because
 	// there is an error reading old data from the database when maintainVersion changes
 	if s == "" {
-		return nil, errors.New("invalid system version")
+		logrus.Warn("invalid system version")
+		return systemVersion(""), nil
 	}
 
 	return systemVersion(s), nil

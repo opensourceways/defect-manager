@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	sdk "github.com/opensourceways/go-gitee/gitee"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/opensourceways/defect-manager/utils"
@@ -139,7 +140,7 @@ func (impl eventHandler) parseIssue(assigner *sdk.UserHook, body string) (parseI
 
 	result, err := impl.parse(parseIssueParam, assigner, body)
 	if err != nil {
-		return parseIssueResult{}, err
+		logrus.Errorf("when parse issue error occurred: %v", err)
 	}
 
 	var ret parseIssueResult
@@ -149,9 +150,10 @@ func (impl eventHandler) parseIssue(assigner *sdk.UserHook, body string) (parseI
 
 	if v, ok := result[itemComponents]; ok {
 		split := strings.Split(v, "-")
-
-		ret.Component = strings.Join(split[:len(split)-1], "-")
-		ret.ComponentVersion = split[len(split)-1]
+		if len(split) > 2 {
+			ret.Component = strings.Join(split[:len(split)-1], "-")
+			ret.ComponentVersion = split[len(split)-1]
+		}
 	}
 
 	if v, ok := result[itemOS]; ok {
@@ -248,16 +250,6 @@ func (impl eventHandler) parse(items []string, assigner *sdk.UserHook, body stri
 		case itemSeverityLevel:
 			if _, exist := severityLevelMap[parseResult[item]]; !exist {
 				mr.Add(genErr(itemName[itemSeverityLevel]))
-			}
-		case itemOS:
-			maintainVersion := sets.NewString(impl.cfg.MaintainVersion...)
-			if !maintainVersion.Has(parseResult[item]) {
-				mr.Add(genErr(itemName[itemOS]))
-			}
-		case itemComponents:
-			split := strings.Split(parseResult[item], "-")
-			if len(split) < 2 {
-				mr.Add(genErr(itemName[itemComponents]))
 			}
 		}
 	}
