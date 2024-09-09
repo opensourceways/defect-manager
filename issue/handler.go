@@ -250,7 +250,11 @@ func (impl eventHandler) handleIssueOpen(e *sdk.IssueEvent) error {
 
 // || e.Comment.User.Login == impl.botName
 func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
-	logrus.Infof("handle note event %v", e)
+	fmt.Printf("NOTE EVENT: %v\n", e)
+	fmt.Printf("NOTE EVENT: %v\n", e.Issue)
+	fmt.Printf("NOTE EVENT: %v\n", e.Issue.Body)
+	fmt.Printf("NOTE EVENT: %v\n", impl.cfg.DevelopVersion)
+	//logrus.Infof("handle note event %v", e)
 	/* 	for _, v := range impl.cfg.DevelopVersion {
 		if strings.Contains(e.Issue.Body, v) {
 			return nil
