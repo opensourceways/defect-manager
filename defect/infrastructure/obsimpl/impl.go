@@ -9,6 +9,8 @@ import (
 	"github.com/opensourceways/defect-manager/utils"
 )
 
+const uploadedDefect = "update_defect.txt"
+
 var instance *obsImpl
 
 func Init(cfg *Config) error {
@@ -37,7 +39,11 @@ type obsImpl struct {
 func (impl obsImpl) Upload(fileName string, data []byte) error {
 	input := &obs.PutObjectInput{}
 	input.Bucket = impl.cfg.Bucket
-	input.Key = fmt.Sprintf("%s/%s/%s", impl.cfg.Directory, utils.Date(), fileName)
+	if fileName == uploadedDefect {
+		input.Key = fmt.Sprintf("%s/%s", impl.cfg.Directory, fileName)
+	} else {
+		input.Key = fmt.Sprintf("%s/%d/%s", impl.cfg.Directory, utils.Year(), fileName)
+	}
 	input.Body = bytes.NewReader(data)
 
 	_, err := impl.cli.PutObject(input)
