@@ -104,6 +104,7 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 
 	publishedNum, err := d.backend.PublishedDefects()
 	if err != nil {
+		logrus.Errorf("get published defect error: %s", err.Error())
 		return
 	}
 
