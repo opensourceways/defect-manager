@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 func TrimString(str string) string {
@@ -82,4 +84,10 @@ func RemoveDuplicates(strSlice []string) []string {
 	}
 
 	return result
+}
+
+func Catchs() {
+	if err := recover(); err != nil {
+		logrus.Errorf("The program is abnormal, err: %s", err)
+	}
 }

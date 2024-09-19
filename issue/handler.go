@@ -66,6 +66,8 @@ type eventHandler struct {
 }
 
 func (impl eventHandler) HandleIssueEvent(e *sdk.IssueEvent) error {
+	defer defectUtils.Catchs()
+
 	if e.Issue.TypeName != impl.cfg.IssueType {
 		return nil
 	}
@@ -250,18 +252,21 @@ func (impl eventHandler) handleIssueOpen(e *sdk.IssueEvent) error {
 
 // || e.Comment.User.Login == impl.botName
 func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
-	logrus.Infof("handle note event %v", e.Comment.Body)
-	for _, v := range impl.cfg.DevelopVersion {
-		if strings.Contains(e.Issue.Body, v) {
-			return nil
-		}
-	}
+	defer defectUtils.Catchs()
 
 	if !e.IsIssue() || e.Issue.TypeName != impl.cfg.IssueType ||
 		e.Issue.StateName == StatusFinished || e.Issue.StateName == StatusCancel ||
 		e.Issue.StateName == StatusSuspend || e.Comment.User.Login == impl.botName {
 		return nil
 	}
+
+	//logrus.Infof("handle note event %v", e.Comment.Body)
+	for _, v := range impl.cfg.DevelopVersion {
+		if strings.Contains(e.Issue.Body, v) {
+			return nil
+		}
+	}
+
 	commentIssue := func(content string) error {
 		return impl.cli.CreateIssueComment(e.Project.Namespace,
 			e.Project.Name, e.Issue.Number, content,
@@ -520,7 +525,7 @@ func (impl eventHandler) dealIssue(dp dealIssueParam) (string, error) {
 			return newbody, nil
 		}
 	}
-	logrus.Infof("repo: %s", strings.Join([]string{dp.namespace, dp.name}, "/"))
+	//logrus.Infof("repo: %s", strings.Join([]string{dp.namespace, dp.name}, "/"))
 	committerList := CommitterInstance.listCommitter(strings.Join([]string{dp.namespace, dp.name}, "/"))
 	if len(committerList) == 0 {
 		return "", fmt.Errorf("获取committer列表失败，请联系管理员")
@@ -593,7 +598,7 @@ func (impl eventHandler) setDeadline(name string, createAt time.Time) IssueParam
 
 func (impl eventHandler) setIssueAssignee(namespace, repo, number string) error {
 	pathWithNamespace := strings.Join([]string{namespace, repo}, "/")
-	logrus.Infof("pathWithNamespace: %s", pathWithNamespace)
+	//logrus.Infof("pathWithNamespace: %s", pathWithNamespace)
 	assigner := CommitterInstance.getAssigner(pathWithNamespace)
 	if assigner == "" {
 		return fmt.Errorf("%s get assigner error", namespace)
