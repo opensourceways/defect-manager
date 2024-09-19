@@ -70,6 +70,8 @@ func (d defectService) SaveDefects(cmd CmdToSaveDefect) error {
 }
 
 func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, err error) {
+	defer utils.Catchs()
+
 	opt := repository.OptToFindDefects{
 		Status: dp.IssueStatusClosed,
 	}
@@ -122,6 +124,8 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 }
 
 func (d defectService) GenerateBulletins(number []string) error {
+	defer utils.Catchs()
+
 	opt := repository.OptToFindDefects{
 		Number: number,
 	}

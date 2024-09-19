@@ -105,7 +105,7 @@ func (impl eventHandler) handleIssueReject(e *sdk.IssueEvent) error {
 
 	comments, err := impl.cli.ListIssueComments(e.Project.Namespace, e.Project.Name, e.Issue.Number)
 	if err != nil {
-		logrus.Errorf("get comments error: %s", err.Error())
+		logrus.Errorf("%s/%s issue number is %s, get comments error: %s", e.Project.Namespace, e.Project.Name, e.Issue.Number, err.Error())
 
 		return nil
 	}
@@ -147,7 +147,7 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 	issueInfo, err := impl.parseIssue(e.Sender, e.Issue.Body)
 	if err != nil {
 		//return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
-		logrus.Errorf("parse issue error: %s", err.Error())
+		logrus.Errorf("%s/%s issue number is %s, parse issue error: %s", e.Project.Namespace, e.Project.Name, e.Issue.Number, err.Error())
 	}
 
 	comment := impl.getAnalysisComment(e)
@@ -225,7 +225,7 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 		return nil
 	}
 
-	logrus.Errorf("when save defect some err occurred: %s", err.Error())
+	logrus.Errorf("%s/%s issue number is %s, when save defect some err occurred: %s", e.Project.Namespace, e.Project.Name, e.Issue.Number, err.Error())
 
 	return nil
 }
@@ -260,7 +260,6 @@ func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
 		return nil
 	}
 
-	//logrus.Infof("handle note event %v", e.Comment.Body)
 	for _, v := range impl.cfg.DevelopVersion {
 		if strings.Contains(e.Issue.Body, v) {
 			return nil
@@ -332,7 +331,7 @@ func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
 func (impl eventHandler) getAnalysisComment(e *sdk.IssueEvent) string {
 	comments, err := impl.cli.ListIssueComments(e.Project.Namespace, e.Project.Name, e.Issue.Number)
 	if err != nil {
-		logrus.Errorf("get comments error: %s", err.Error())
+		logrus.Errorf("%s/%s issue number is %s, get comments error: %s", e.Project.Namespace, e.Project.Name, e.Issue.Number, err.Error())
 
 		return ""
 	}
@@ -450,7 +449,7 @@ func (impl eventHandler) checkIssue(cp checkIssueParam) error {
 	if cp.issueAssigner == nil {
 		err := impl.setIssueAssignee(cp.namespace, cp.name, cp.issueNumber)
 		if err != nil {
-			logrus.Errorf("set issue assignee error: %s", err.Error())
+			logrus.Errorf("%s/%s issue number is %s, set issue assignee error: %s", cp.namespace, cp.name, cp.issueNumber, err.Error())
 		}
 	}
 
@@ -463,7 +462,7 @@ func (impl eventHandler) checkIssue(cp checkIssueParam) error {
 
 	_, err := impl.dealIssue(dp)
 	if err != nil {
-		return fmt.Errorf("deal issue error: %s", err.Error())
+		return fmt.Errorf("%s/%s issue number is %s, deal issue error: %s", cp.namespace, cp.name, cp.issueNumber, err.Error())
 	}
 
 	issueUpdateParam := modifyIssueBodyStyle(cp.labels, cp.name)
@@ -525,7 +524,7 @@ func (impl eventHandler) dealIssue(dp dealIssueParam) (string, error) {
 			return newbody, nil
 		}
 	}
-	//logrus.Infof("repo: %s", strings.Join([]string{dp.namespace, dp.name}, "/"))
+
 	committerList := CommitterInstance.listCommitter(strings.Join([]string{dp.namespace, dp.name}, "/"))
 	if len(committerList) == 0 {
 		return "", fmt.Errorf("获取committer列表失败，请联系管理员")
@@ -598,7 +597,6 @@ func (impl eventHandler) setDeadline(name string, createAt time.Time) IssueParam
 
 func (impl eventHandler) setIssueAssignee(namespace, repo, number string) error {
 	pathWithNamespace := strings.Join([]string{namespace, repo}, "/")
-	//logrus.Infof("pathWithNamespace: %s", pathWithNamespace)
 	assigner := CommitterInstance.getAssigner(pathWithNamespace)
 	if assigner == "" {
 		return fmt.Errorf("%s get assigner error", namespace)
