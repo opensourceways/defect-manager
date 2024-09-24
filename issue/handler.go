@@ -72,9 +72,15 @@ func (impl eventHandler) HandleIssueEvent(e *sdk.IssueEvent) error {
 		return nil
 	}
 
-	for _, v := range impl.cfg.DevelopVersion {
-		if strings.Contains(e.Issue.Body, v) {
-			return nil
+	//get the OS version content to determine whether the issue belongs to the develop version
+	matchOSContent := regexpOfItems[itemOS].FindAllStringSubmatch(e.Issue.Body, -1)
+	if len(matchOSContent) > 0 || len(matchOSContent[regMatchResult]) > 2 {
+		matchItem := matchOSContent[regMatchResult][regMatchItem]
+		trimItemInfo := defectUtils.TrimString(matchItem)
+		for _, v := range impl.cfg.DevelopVersion {
+			if strings.Contains(trimItemInfo, v) {
+				return nil
+			}
 		}
 	}
 
@@ -260,9 +266,15 @@ func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
 		return nil
 	}
 
-	for _, v := range impl.cfg.DevelopVersion {
-		if strings.Contains(e.Issue.Body, v) {
-			return nil
+	//get the OS version content to determine whether the issue belongs to the develop version
+	matchOSContent := regexpOfItems[itemOS].FindAllStringSubmatch(e.Issue.Body, -1)
+	if len(matchOSContent) > 0 || len(matchOSContent[regMatchResult]) > 2 {
+		matchItem := matchOSContent[regMatchResult][regMatchItem]
+		trimItemInfo := defectUtils.TrimString(matchItem)
+		for _, v := range impl.cfg.DevelopVersion {
+			if strings.Contains(trimItemInfo, v) {
+				return nil
+			}
 		}
 	}
 
