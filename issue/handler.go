@@ -74,7 +74,7 @@ func (impl eventHandler) HandleIssueEvent(e *sdk.IssueEvent) error {
 
 	//get the OS version content to determine whether the issue belongs to the develop version
 	matchOSContent := regexpOfItems[itemOS].FindAllStringSubmatch(e.Issue.Body, -1)
-	if len(matchOSContent) > 0 || len(matchOSContent[regMatchResult]) > 2 {
+	if len(matchOSContent) > 0 && len(matchOSContent[regMatchResult]) > 2 {
 		matchItem := matchOSContent[regMatchResult][regMatchItem]
 		trimItemInfo := defectUtils.TrimString(matchItem)
 		for _, v := range impl.cfg.DevelopVersion {
@@ -268,7 +268,7 @@ func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
 
 	//get the OS version content to determine whether the issue belongs to the develop version
 	matchOSContent := regexpOfItems[itemOS].FindAllStringSubmatch(e.Issue.Body, -1)
-	if len(matchOSContent) > 0 || len(matchOSContent[regMatchResult]) > 2 {
+	if len(matchOSContent) > 0 && len(matchOSContent[regMatchResult]) > 2 {
 		matchItem := matchOSContent[regMatchResult][regMatchItem]
 		trimItemInfo := defectUtils.TrimString(matchItem)
 		for _, v := range impl.cfg.DevelopVersion {
