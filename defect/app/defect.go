@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -110,8 +111,15 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 		return
 	}
 
+	var trimPublishNum []string
+	for _, s := range publishedNum {
+		// 使用 strings.TrimPrefix 函数去掉前缀
+		trimmed := strings.TrimPrefix(s, "BUG-"+strconv.Itoa(utils.Year())+"-")
+		trimPublishNum = append(trimPublishNum, trimmed)
+	}
+
 	var unpublishedDefects domain.Defects
-	ps := sets.NewString(publishedNum...)
+	ps := sets.NewString(trimPublishNum...)
 	logrus.Infof("publishedNum : %s", ps)
 	for _, rfd := range rpmForDefects {
 		if _, ok := ps[rfd.Issue.Number]; !ok {
