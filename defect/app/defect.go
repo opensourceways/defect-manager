@@ -112,8 +112,10 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 
 	var unpublishedDefects domain.Defects
 	ps := sets.NewString(publishedNum...)
+	logrus.Infof("publishedNum : %s", ps)
 	for _, rfd := range rpmForDefects {
 		if _, ok := ps[rfd.Issue.Number]; !ok {
+			logrus.Infof("unpublished defect : %s", rfd.Issue.Number)
 			unpublishedDefects = append(unpublishedDefects, rfd)
 		}
 	}
