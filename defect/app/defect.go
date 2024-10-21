@@ -2,12 +2,10 @@ package app
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/opensourceways/defect-manager/defect/domain"
 	"github.com/opensourceways/defect-manager/defect/domain/backend"
@@ -23,7 +21,7 @@ import (
 const uploadedDefect = "update_defect.txt"
 
 type DefectService interface {
-	IsDefectExist(*domain.Issue) (bool, error)
+	IsDefectExist(*domain.Issue) (domain.Defect, bool, error)
 	SaveDefects(CmdToSaveDefect) error
 	CollectDefects(string) ([]CollectDefectsDTO, error)
 	GenerateBulletins([]string) error
@@ -53,12 +51,12 @@ type defectService struct {
 	obs         obs.OBS
 }
 
-func (d defectService) IsDefectExist(issue *domain.Issue) (bool, error) {
+func (d defectService) IsDefectExist(issue *domain.Issue) (domain.Defect, bool, error) {
 	return d.repo.HasDefect(issue)
 }
 
 func (d defectService) SaveDefects(cmd CmdToSaveDefect) error {
-	has, err := d.repo.HasDefect(&cmd.Issue)
+	_, has, err := d.repo.HasDefect(&cmd.Issue)
 	if err != nil {
 		return err
 	}
@@ -73,25 +71,19 @@ func (d defectService) SaveDefects(cmd CmdToSaveDefect) error {
 func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, err error) {
 	defer utils.Catchs()
 
-	opt := repository.OptToFindDefects{
-		Status: dp.IssueStatusClosed,
-	}
-
-	defects, err := d.repo.FindDefects(opt)
+	defects, err := d.repo.FindDefects(repository.OptToFindDefects{})
 	if err != nil || len(defects) == 0 {
 		return
 	}
 
 	var versionForDefects domain.Defects
 	for _, d := range defects {
-		for _, av := range d.AffectedVersion {
+		for _, av := range d.FixedVersion {
 			if av.String() == version {
 				versionForDefects = append(versionForDefects, d)
 			}
 		}
 	}
-
-	logrus.Infof("versionForDefects : %s", versionForDefects)
 
 	d.productTree.InitCache()
 	defer d.productTree.CleanCache()
@@ -99,32 +91,47 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 	var rpmForDefects domain.Defects
 	instance := producttreeimpl.Instance()
 	for _, vdf := range versionForDefects {
-		rpmOfComponent := instance.ParseRPM(vdf.CreatedAt, vdf.Component, vdf.AffectedVersion[0].String())
+		rpmOfComponent := instance.ParseRPM(vdf.UpdatedAt, vdf.Component, version)
 		if rpmOfComponent != "" {
 			rpmForDefects = append(rpmForDefects, vdf)
 		}
 	}
 
-	publishedNum, err := d.backend.PublishedDefects()
+	issuesNumAndVersions, err := d.backend.PublishedDefects()
 	if err != nil {
 		logrus.Errorf("get published defect error: %s", err.Error())
 		return
 	}
 
-	var trimPublishNum []string
-	for _, s := range publishedNum {
-		// 使用 strings.TrimPrefix 函数去掉前缀
-		trimmed := strings.TrimPrefix(s, "BUG-"+strconv.Itoa(utils.Year())+"-")
-		trimPublishNum = append(trimPublishNum, trimmed)
+	issueMap := make(map[string][]string)
+	for _, issue := range issuesNumAndVersions {
+		issueMap[issue.IssueNum] = append(issueMap[issue.IssueNum], issue.Versions...)
 	}
 
 	var unpublishedDefects domain.Defects
-	ps := sets.NewString(trimPublishNum...)
-	logrus.Infof("publishedNum : %s", ps)
 	for _, rfd := range rpmForDefects {
-		if _, ok := ps[rfd.Issue.Number]; !ok {
-			logrus.Infof("unpublished defect : %s", rfd.Issue.Number)
+		if _, ok := issueMap[rfd.Issue.Number]; !ok {
 			unpublishedDefects = append(unpublishedDefects, rfd)
+			rfd.UnPublishedVersion = rfd.FixedVersion
+			if err = d.SaveDefects(rfd); err != nil {
+				logrus.Errorf("when collect defects, save defect error: %s", err.Error())
+			}
+			continue
+		}
+
+		if len(issueMap[rfd.Issue.Number]) != len(rfd.FixedVersion) {
+			unpublishedDefects = append(unpublishedDefects, rfd)
+			unPubishedVersion := d.findUnPubishedVersion(rfd.FixedVersion, issueMap[rfd.Issue.Number])
+			rfd.UnPublishedVersion = unPubishedVersion
+			if err = d.SaveDefects(rfd); err != nil {
+				logrus.Errorf("when collect defects, save defect error: %s", err.Error())
+			}
+			continue
+		}
+
+		rfd.UnPublishedVersion = []dp.SystemVersion{}
+		if err = d.SaveDefects(rfd); err != nil {
+			logrus.Errorf("when collect defects, save defect error: %s", err.Error())
 		}
 	}
 
@@ -158,9 +165,9 @@ func (d defectService) GenerateBulletins(number []string) error {
 	var uploadedFile []string
 	for _, b := range bulletins {
 		maxIdentification++
-		b.Identification = fmt.Sprintf("cvrf-openEuler-BA-%d-%d", utils.Year(), maxIdentification)
+		b.Identification = fmt.Sprintf("openEuler-BA-%d-%d", utils.Year(), maxIdentification)
 
-		b.ProductTree, err = d.productTree.GetTree(b.Defects[0].CreatedAt, b.Component, b.AffectedVersion)
+		b.ProductTree, err = d.productTree.GetTree(b.Defects[0].CreatedAt, b.Component, b.UnPublishedVersion)
 		if err != nil {
 			logrus.Errorf("%s, component %s, get productTree error: %s", b.Identification, b.Component, err.Error())
 
@@ -199,4 +206,28 @@ func (d defectService) uploadUploadedFile(files []string) error {
 	}
 
 	return d.obs.Upload(uploadedDefect, []byte(strings.Join(uploadedFileWithPrefix, "\n")))
+}
+
+// 对比已修复的版本和已发布的版本，筛选出未发布的版本
+func (d defectService) findUnPubishedVersion(fixedVersions []dp.SystemVersion, publishedVersions []string) []dp.SystemVersion {
+	unPubishedVersion := make([]dp.SystemVersion, 0)
+
+	// 创建一个 map 用于快速查找 publishedVersion 中的元素
+	publishedVersionMap := make(map[dp.SystemVersion]bool)
+	for _, element := range publishedVersions {
+		sv, err := dp.NewSystemVersion(element)
+		if err != nil {
+			continue
+		}
+		publishedVersionMap[sv] = true
+	}
+
+	// 遍历 fixedVersion，检查每个元素是否在 publishedVersion 中
+	for _, element := range fixedVersions {
+		if !publishedVersionMap[element] {
+			unPubishedVersion = append(unPubishedVersion, element)
+		}
+	}
+
+	return unPubishedVersion
 }

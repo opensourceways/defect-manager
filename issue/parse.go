@@ -79,6 +79,7 @@ var (
 		itemKernel:                   regexp.MustCompile(`(内核版本)[】][(（]如kernel-5.10.0-60.138.0.165，参考命令"uname -r"结果[)）]\*\*([\s\S]*?)\*\*【缺陷所属软件及版本号`),
 		itemComponents:               regexp.MustCompile(`(缺陷所属软件及版本号)[】][(（]如kernel-5.10.0-60.138.0.165，参考命令"rpm -q 包名"结果[)）]\*\*([\s\S]*?)\*\*【环境信息`),
 		itemProblemReproductionSteps: regexp.MustCompile(`(问题复现步骤)[】][:：]请描述具体的操作步骤\*\*([\s\S]*?)\*\*【实际结果`),
+		itemReferenceAndGuidanceUrl:  regexp.MustCompile(`(缺陷详情及分析指导参考链接)[】]\*\*([\s\S]*?)\*\*二、缺陷分析结构反馈`),
 		itemInfluence:                regexp.MustCompile(`(影响性分析说明)[:：]([\s\S]*?)缺陷严重等级`),
 		itemSeverityLevel:            regexp.MustCompile(`(缺陷严重等级)[:：]\(Critical/High/Moderate/Low\)([\s\S]*?)缺陷根因说明`),
 		itemRootCause:                regexp.MustCompile(`(缺陷根因说明)[:：]([\s\S]*?)受影响版本排查`),
@@ -92,6 +93,7 @@ var (
 		itemKernel,
 		itemComponents,
 		itemProblemReproductionSteps,
+		itemReferenceAndGuidanceUrl,
 	}
 
 	sortOfCommentItems = []string{
@@ -120,6 +122,7 @@ type parseIssueResult struct {
 	ComponentVersion string
 	OS               string
 	Description      string
+	ReferenceURL     string
 }
 
 type parseCommentResult struct {
@@ -134,9 +137,6 @@ type parseCommentResult struct {
 
 func (impl eventHandler) parseIssue(assigner *sdk.UserHook, body string) (parseIssueResult, error) {
 	var parseIssueParam = sortOfIssueItems
-	/* 	if strings.Contains(body, "###") {
-		parseIssueParam = sortOfIssueTitleItems
-	} */
 
 	result, err := impl.parse(parseIssueParam, assigner, body)
 	if err != nil {
@@ -162,6 +162,10 @@ func (impl eventHandler) parseIssue(assigner *sdk.UserHook, body string) (parseI
 
 	if v, ok := result[itemDescription]; ok {
 		ret.Description = v
+	}
+
+	if v, ok := result[itemReferenceAndGuidanceUrl]; ok {
+		ret.ReferenceURL = v
 	}
 
 	return ret, nil

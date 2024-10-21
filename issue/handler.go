@@ -152,7 +152,6 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 
 	issueInfo, err := impl.parseIssue(e.Sender, e.Issue.Body)
 	if err != nil {
-		//return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
 		logrus.Errorf("%s/%s issue number is %s, parse issue error: %s", e.Project.Namespace, e.Project.Name, e.Issue.Number, err.Error())
 	}
 
@@ -186,25 +185,9 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 		return nil
 	}
 
-	exist, err := impl.service.IsDefectExist(&domain.Issue{
-		Number: e.GetIssueNumber(),
-		Org:    e.Project.Namespace,
-	})
-	if err != nil {
-		return err
-	}
+	relatedPRNotMerged, mergedVersion := impl.checkRelatedPR(e, commentInfo.AffectedVersion)
 
-	if exist {
-		newLabels := dealLabels(e.Issue.Labels, fixedLabel)
-		if _, err := impl.cli.UpdateIssue(e.Project.Namespace, e.Issue.Number,
-			sdk.IssueUpdateParam{Labels: newLabels, Repo: e.Project.Name}); err != nil {
-			return fmt.Errorf("update issue error: %s", err.Error())
-		}
-
-		return nil
-	}
-
-	if relatedPRNotMerged := impl.checkRelatedPR(e, commentInfo.AffectedVersion); relatedPRNotMerged != nil {
+	if relatedPRNotMerged != nil {
 		if err = impl.cli.ReopenIssue(e.Project.Namespace, e.Project.Name, e.Issue.Number); err != nil {
 			return fmt.Errorf("reopen issue error: %s", err.Error())
 		}
@@ -212,16 +195,19 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 		logrus.Infof("reopen issue %s %s", e.Project.PathWithNamespace, e.Issue.Number)
 
 		str := fmt.Sprintf(reOpenComment, e.Sender.UserName, e.Issue.Number, strings.Join(relatedPRNotMerged, "/"), PrIssueLink)
-		return commentIssue(str)
+		if err = commentIssue(str); err != nil {
+			return err
+		}
 	}
 
-	cmd, err := impl.toCmd(e.Issue.Title, e.Issue.Number, e.Repository.Namespace, e.Repository.Name, issueInfo, commentInfo)
+	cmd, err := impl.toCmd(e.Issue.Title, e.Issue.Number, e.Repository.Namespace,
+		e.Repository.Name, e.Issue.StateName, mergedVersion, issueInfo, commentInfo)
 	if err != nil {
 		return fmt.Errorf("to cmd error: %s", err.Error())
 	}
 
 	err = impl.service.SaveDefects(cmd)
-	if err == nil {
+	if err == nil && relatedPRNotMerged == nil {
 		newLabels := dealLabels(e.Issue.Labels, fixedLabel)
 		if _, err := impl.cli.UpdateIssue(e.Project.Namespace, e.Issue.Number,
 			sdk.IssueUpdateParam{Labels: newLabels, Repo: e.Project.Name}); err != nil {
@@ -231,7 +217,7 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 		return nil
 	}
 
-	logrus.Errorf("%s/%s issue number is %s, when save defect some err occurred: %s", e.Project.Namespace, e.Project.Name, e.Issue.Number, err.Error())
+	logrus.Errorf("%s/%s issue number is %s, when save defect some err occurred: %s", e.Project.Namespace, e.Project.Name, e.Issue.Number, err)
 
 	return nil
 }
@@ -239,6 +225,22 @@ func (impl eventHandler) handleIssueClosed(e *sdk.IssueEvent) error {
 func (impl eventHandler) handleIssueOpen(e *sdk.IssueEvent) error {
 	if *e.Action == "assign" {
 		return nil
+	}
+
+	cmd, err := impl.toCmd(e.Issue.Title, e.Issue.Number, e.Project.Namespace, e.Project.Name,
+		e.Issue.StateName, nil, parseIssueResult{}, parseCommentResult{})
+	if err != nil {
+		return fmt.Errorf("to cmd error: %s", err.Error())
+	}
+
+	if defect, exist, _ := impl.service.IsDefectExist(&domain.Issue{Number: e.Issue.Number, Org: e.Project.Namespace}); exist {
+		cmd.AffectedVersion = defect.AffectedVersion
+		cmd.FixedVersion = defect.FixedVersion
+	}
+
+	err = impl.service.SaveDefects(cmd)
+	if err != nil {
+		return fmt.Errorf("when issue opensave defect error: %s", err.Error())
 	}
 
 	cp := checkIssueParam{
@@ -304,12 +306,22 @@ func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
 		issueInfo, err := impl.parseIssue(e.Comment.User, e.Issue.Body)
 		if err != nil {
 			logrus.Errorf("parse issue error: %s", err.Error())
-			//return commentIssue(strings.Replace(err.Error(), ". ", "\n\n", -1))
 		}
 
 		commentInfo, err := impl.parseComment(e.Comment.User, e.Comment.Body)
 		if err != nil {
 			return commentIssue(err.Error())
+		}
+
+		cmd, err := impl.toCmd(e.Issue.Title, e.Issue.Number, e.Repository.Namespace, e.Repository.Name,
+			e.Issue.StateName, nil, issueInfo, commentInfo)
+		if err != nil {
+			return fmt.Errorf("to cmd error: %s", err.Error())
+		}
+
+		err = impl.service.SaveDefects(cmd)
+		if err != nil {
+			return fmt.Errorf("when comment save defect error: %s", err.Error())
 		}
 
 		issueUpdateParam := analysisCommentFeedback(e.Issue.Body, e.Project.Name, commentInfo)
@@ -318,22 +330,7 @@ func (impl eventHandler) HandleNoteEvent(e *sdk.NoteEvent) error {
 		}
 
 		tbStr := analysisComplete(e.Issue.Assignee, commentInfo)
-		if err := commentIssue(tbStr); err != nil {
-			return fmt.Errorf("create issue form comment error: %s", err.Error())
-		}
-
-		if len(commentInfo.AffectedVersion) == 0 {
-
-			cmd, err := impl.toCmd(e.Issue.Title, e.Issue.Number, e.Repository.Namespace, e.Repository.Name, issueInfo, commentInfo)
-			if err != nil {
-				return fmt.Errorf("to cmd error: %s", err.Error())
-			}
-
-			return impl.service.SaveDefects(cmd)
-		}
-
-		return nil
-
+		return commentIssue(tbStr)
 	}
 
 	return nil
@@ -358,17 +355,23 @@ func (impl eventHandler) getAnalysisComment(e *sdk.IssueEvent) string {
 	return ""
 }
 
-func (impl eventHandler) toCmd(title, number, namespace, name string, issue parseIssueResult, comment parseCommentResult) (
-	cmd app.CmdToSaveDefect, err error) {
-	systemVersion, err := dp.NewSystemVersion(issue.OS)
+func (impl eventHandler) toCmd(
+	title, number, namespace, name, stateName string,
+	mergedVersion []string, issue parseIssueResult, comment parseCommentResult) (
+	cmd app.CmdToSaveDefect, err error,
+) {
+	status, err := dp.NewIssueStatus(stateName)
 	if err != nil {
-		return
+		logrus.Warningf("invalid state name: %s", stateName)
 	}
+	systemVersion, _ := dp.NewSystemVersion(issue.OS)
 
 	securityLevel, err := dp.NewSeverityLevel(comment.SeverityLevel)
 	if err != nil {
-		return
+		logrus.Warningf("invalid severity level: %s", comment.SeverityLevel)
 	}
+
+	referenceURL, _ := dp.NewURL(issue.ReferenceURL)
 
 	var affectedVersion []dp.SystemVersion
 	for _, v := range comment.AffectedVersion {
@@ -379,37 +382,48 @@ func (impl eventHandler) toCmd(title, number, namespace, name string, issue pars
 		affectedVersion = append(affectedVersion, dv)
 	}
 
+	var fixedVersion []dp.SystemVersion
+	for _, v := range mergedVersion {
+		var dv dp.SystemVersion
+		if dv, err = dp.NewSystemVersion(v); err != nil {
+			return
+		}
+		fixedVersion = append(fixedVersion, dv)
+	}
+
 	return app.CmdToSaveDefect{
 		Kernel:           issue.Kernel,
 		Component:        name,
 		ComponentVersion: issue.ComponentVersion,
 		SystemVersion:    systemVersion,
 		Description:      issue.Description,
-		ReferenceURL:     nil,
+		ReferenceURL:     referenceURL,
 		GuidanceURL:      nil,
 		Influence:        comment.Influence,
 		SeverityLevel:    securityLevel,
 		RootCause:        comment.RootCause,
 		AffectedVersion:  affectedVersion,
+		FixedVersion:     fixedVersion,
 		ABI:              strings.Join(comment.Abi, ","),
 		Issue: domain.Issue{
 			Title:  title,
 			Number: number,
 			Org:    namespace,
 			Repo:   name,
-			Status: dp.IssueStatusClosed,
+			Status: status,
 		},
 	}, nil
 }
 
-func (impl eventHandler) checkRelatedPR(e *sdk.IssueEvent, versions []string) []string {
+// 返回 PR没有合并的分支和 PR合并了的分支
+func (impl eventHandler) checkRelatedPR(e *sdk.IssueEvent, versions []string) (relatedPRNotMerged, mergedVersion []string) {
 	endpoint := fmt.Sprintf("https://gitee.com/api/v5/repos/%v/issues/%v/pull_requests?access_token=%s&repo=%s",
 		e.Project.Namespace, e.Issue.Number, impl.cfg.RobotToken, e.Project.Name,
 	)
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		logrus.Errorf("create request error: %s", err.Error())
-		return nil
+		return nil, nil
 	}
 
 	var prs []sdk.PullRequest
@@ -417,32 +431,39 @@ func (impl eventHandler) checkRelatedPR(e *sdk.IssueEvent, versions []string) []
 	bytes, _, err := cli.Download(req)
 	if err != nil {
 		logrus.Errorf("download error: %s", err.Error())
-		return nil
+		return nil, nil
 	}
 
 	if err := json.Unmarshal(bytes, &prs); err != nil {
 		logrus.Errorf("unmarshal error: %s", err.Error())
-		return nil
+		return nil, nil
 	}
 
-	mergedVersion := sets.NewString()
+	mergeVersionSets := sets.NewString()
 	for _, pr := range prs {
+		// 过滤掉不是src-openeuler组织下的PR
+		if pr.Base.Repo.Namespace.Path != NameSpacePath {
+			continue
+		}
+
 		if pr.State == sdk.StatusMerged {
-			mergedVersion.Insert(pr.Base.Ref)
+			mergeVersionSets.Insert(pr.Base.Ref)
 		}
 	}
-	var relatedPRNotMerged []string
+
 	for _, v := range versions {
-		if !mergedVersion.Has(v) {
+		if !mergeVersionSets.Has(v) {
 			relatedPRNotMerged = append(relatedPRNotMerged, v)
 		}
 	}
 
+	mergedVersion = mergeVersionSets.UnsortedList()
+
 	if len(relatedPRNotMerged) != 0 {
-		return relatedPRNotMerged
+		return relatedPRNotMerged, mergedVersion
 	}
 
-	return nil
+	return nil, mergedVersion
 }
 
 type checkIssueParam struct {
@@ -477,25 +498,11 @@ func (impl eventHandler) checkIssue(cp checkIssueParam) error {
 		return fmt.Errorf("%s/%s issue number is %s, deal issue error: %s", cp.namespace, cp.name, cp.issueNumber, err.Error())
 	}
 
-	issueUpdateParam := modifyIssueBodyStyle(cp.labels, cp.name)
+	issueUpdateParam := modifyIssueLabels(cp.labels, cp.name)
 
 	if _, err := impl.cli.UpdateIssue(cp.namespace, cp.issueNumber, issueUpdateParam); err != nil {
 		return fmt.Errorf("update issue error: %s", err.Error())
 	}
-
-	/*  	if _, err := impl.parseIssue(cp.issueUser, newbody); err != nil {
-		return impl.cli.CreateIssueComment(cp.namespace,
-			cp.name, cp.issueNumber, strings.Replace(err.Error(), ". ", "\n\n", -1),
-		)
-	}
-
-	if _, err := impl.cli.UpdateIssue(cp.namespace, cp.issueNumber, issueUpdateParam); err != nil {
-		return fmt.Errorf("update issue error: %s", err.Error())
-	} */
-
-	/* 	if err := impl.cli.CreateIssueComment(cp.namespace, cp.name, cp.issueNumber, fmt.Sprintf(issueCheckSuccess, cp.issueUser.UserName)); err != nil {
-		return fmt.Errorf("create issue comment error: %s", err.Error())
-	} */
 
 	dl := deadLineParam{
 		name:         cp.name,
@@ -514,6 +521,8 @@ type dealIssueParam struct {
 	issueNumber string
 }
 
+// 1.创建issue后修改issue body
+// 2.评论issue: "issue处理注意事项"
 func (impl eventHandler) dealIssue(dp dealIssueParam) (string, error) {
 	newbody := dp.issueBody
 	if !strings.Contains(dp.issueBody, "二、缺陷分析结构反馈") {

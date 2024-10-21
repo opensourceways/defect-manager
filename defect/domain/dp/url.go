@@ -1,8 +1,9 @@
 package dp
 
 import (
-	"errors"
 	"net/url"
+
+	"github.com/sirupsen/logrus"
 )
 
 type dpUrl string
@@ -13,11 +14,13 @@ type URL interface {
 
 func NewURL(s string) (URL, error) {
 	if s == "" {
-		return nil, errors.New("empty url")
+		logrus.Warn("empty url")
+		return dpUrl(""), nil
 	}
 
 	if _, err := url.ParseRequestURI(s); err != nil {
-		return nil, errors.New("invalid url")
+		logrus.Warn("invalid url")
+		return dpUrl(""), nil
 	}
 
 	return dpUrl(s), nil

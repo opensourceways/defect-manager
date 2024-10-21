@@ -3,10 +3,13 @@ package dp
 import "errors"
 
 const (
-	open        = "open"
-	progressing = "progressing"
-	closed      = "closed"
-	rejected    = "rejected"
+	open        = "待办的"
+	progressing = "修复中"
+	closed      = "已完成"
+	confirmed   = "已确认"
+	rejected    = "已挂起"
+	canceled    = "已取消"
+	accepted    = "已验收"
 )
 
 var (
@@ -14,7 +17,10 @@ var (
 		open:        true,
 		progressing: true,
 		closed:      true,
+		confirmed:   true,
 		rejected:    true,
+		canceled:    true,
+		accepted:    true,
 	}
 
 	IssueStatusClosed = issueStatus(closed)

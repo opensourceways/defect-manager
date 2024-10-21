@@ -67,8 +67,8 @@ func (t cliTest) GetIssue(org, repo, number string) (sdk.Issue, error) {
 type serviceTest struct {
 }
 
-func (t serviceTest) IsDefectExist(*domain.Issue) (bool, error) {
-	return false, nil
+func (t serviceTest) IsDefectExist(*domain.Issue) (domain.Defect, bool, error) {
+	return domain.Defect{}, false, nil
 }
 
 func (t serviceTest) SaveDefects(app.CmdToSaveDefect) error {

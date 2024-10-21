@@ -10,6 +10,7 @@ import (
 
 	"github.com/opensourceways/server-common-lib/utils"
 
+	"github.com/opensourceways/defect-manager/defect/domain/backend"
 	localutils "github.com/opensourceways/defect-manager/utils"
 )
 
@@ -40,9 +41,9 @@ type maxIdResult struct {
 }
 
 type publishedDefectResult struct {
-	Code   int      `json:"code"`
-	Result []string `json:"result"`
-	Msg    string   `json:"msg"`
+	Code   int                          `json:"code"`
+	Result []backend.IssueNumAndVersion `json:"result"`
+	Msg    string                       `json:"msg"`
 }
 
 func (impl backendImpl) MaxBulletinID() (maxId int, err error) {
@@ -90,7 +91,8 @@ func (impl backendImpl) MaxBulletinID() (maxId int, err error) {
 	return strconv.Atoi(match[0][2])
 }
 
-func (impl backendImpl) PublishedDefects() (pub []string, err error) {
+// PublishedDefects get all published defects and corresponding versions info
+func (impl backendImpl) PublishedDefects() (iv []backend.IssueNumAndVersion, err error) {
 	url := fmt.Sprintf("%s/cve-security-notice-server/securitynotice/getPublishedBugs",
 		impl.cfg.Endpoint,
 	)

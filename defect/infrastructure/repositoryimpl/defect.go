@@ -38,7 +38,7 @@ type defectImpl struct {
 	db dbimpl
 }
 
-func (impl defectImpl) HasDefect(issue *domain.Issue) (bool, error) {
+func (impl defectImpl) HasDefect(issue *domain.Issue) (domain.Defect, bool, error) {
 	filter := defectDO{
 		Number: issue.Number,
 		Org:    issue.Org,
@@ -51,10 +51,10 @@ func (impl defectImpl) HasDefect(issue *domain.Issue) (bool, error) {
 			err = nil
 		}
 
-		return false, err
+		return result.toDefect(), false, err
 	}
 
-	return true, nil
+	return result.toDefect(), true, nil
 }
 
 func (impl defectImpl) AddDefect(defect *domain.Defect) error {

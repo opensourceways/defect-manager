@@ -17,21 +17,23 @@ type DefectsByComponent []Defect
 type DefectsByVersion []Defect
 
 type Defect struct {
-	Kernel           string
-	Component        string
-	ComponentVersion string
-	SystemVersion    dp.SystemVersion
-	Description      string
-	ReferenceURL     dp.URL
-	GuidanceURL      dp.URL
-	Influence        string
-	SeverityLevel    dp.SeverityLevel
-	RootCause        string
-	AffectedVersion  []dp.SystemVersion
-	ABI              string
-	Issue            Issue
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	Kernel             string
+	Component          string
+	ComponentVersion   string
+	SystemVersion      dp.SystemVersion
+	Description        string
+	ReferenceURL       dp.URL
+	GuidanceURL        dp.URL
+	Influence          string
+	SeverityLevel      dp.SeverityLevel
+	RootCause          string
+	AffectedVersion    []dp.SystemVersion
+	FixedVersion       []dp.SystemVersion
+	UnPublishedVersion []dp.SystemVersion
+	ABI                string
+	Issue              Issue
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type Issue struct {
@@ -42,8 +44,8 @@ type Issue struct {
 	Status dp.IssueStatus
 }
 
-func (d Defect) isAffectVersion(version dp.SystemVersion) bool {
-	for _, v := range d.AffectedVersion {
+func (d Defect) isUnPublishedVersion(version dp.SystemVersion) bool {
+	for _, v := range d.UnPublishedVersion {
 		if v == version {
 			return true
 		}
@@ -83,11 +85,11 @@ func (ds Defects) GenerateBulletins() []SecurityBulletin {
 // need to be combined into a single bulletin
 func (dsc DefectsByComponent) isCombined() bool {
 	for _, d := range dsc {
-		if len(d.AffectedVersion) != len(dp.MaintainVersion) {
+		if len(d.UnPublishedVersion) != len(dp.MaintainVersion) {
 			return false
 		}
 
-		for _, version := range d.AffectedVersion {
+		for _, version := range d.UnPublishedVersion {
 			if !dp.MaintainVersion[version] {
 				return false
 			}
@@ -100,10 +102,10 @@ func (dsc DefectsByComponent) isCombined() bool {
 // CombinedBulletin put all defects in one bulletin
 func (dsc DefectsByComponent) combinedBulletin() SecurityBulletin {
 	return SecurityBulletin{
-		AffectedVersion: dsc[0].AffectedVersion,
-		Date:            utils.Date(),
-		Component:       dsc[0].Component,
-		Defects:         Defects(dsc),
+		UnPublishedVersion: dsc[0].UnPublishedVersion,
+		Date:               utils.Date(),
+		Component:          dsc[0].Component,
+		Defects:            Defects(dsc),
 	}
 }
 
@@ -121,7 +123,7 @@ func (dsc DefectsByComponent) separateByVersion() map[dp.SystemVersion]DefectsBy
 	classifyByVersion := make(map[dp.SystemVersion]DefectsByVersion)
 	for version := range dp.MaintainVersion {
 		for _, d := range dsc {
-			if d.isAffectVersion(version) {
+			if d.isUnPublishedVersion(version) {
 				classifyByVersion[version] = append(classifyByVersion[version], d)
 			}
 		}
@@ -132,9 +134,9 @@ func (dsc DefectsByComponent) separateByVersion() map[dp.SystemVersion]DefectsBy
 
 func (dsv DefectsByVersion) bulletinByVersion(version dp.SystemVersion) SecurityBulletin {
 	return SecurityBulletin{
-		AffectedVersion: []dp.SystemVersion{version},
-		Date:            utils.Date(),
-		Component:       dsv[0].Component,
-		Defects:         Defects(dsv),
+		UnPublishedVersion: []dp.SystemVersion{version},
+		Date:               utils.Date(),
+		Component:          dsv[0].Component,
+		Defects:            Defects(dsv),
 	}
 }

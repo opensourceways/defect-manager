@@ -1,6 +1,6 @@
 package dp
 
-import "errors"
+import "github.com/sirupsen/logrus"
 
 const (
 	critical = "Critical"
@@ -22,7 +22,8 @@ type severityLevel string
 
 func NewSeverityLevel(s string) (SeverityLevel, error) {
 	if !validateSeverityLevel[s] {
-		return nil, errors.New("invalid severity level")
+		logrus.Warningf("invalid severity level: %s", s)
+		return severityLevel(s), nil
 	}
 
 	return severityLevel(s), nil

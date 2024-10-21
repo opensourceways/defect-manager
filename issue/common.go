@@ -95,19 +95,6 @@ const tb1 = `
 **请确认分析内容的准确性，确认无误后，您可以进行后续步骤，否则您可以继续分析**
 `
 
-const tb2 = `
-%v 经过defect-manager解析，已分析的内容如下表所示:
-| 状态  | 需分析 | 内容 |
-|:--:|:--:|---------|
-|已分析|1.影响性分析说明|%v|
-|已分析|2.缺陷严重等级|%v|
-|已分析|3.缺陷根因定位|%v|
-|已分析|4.受影响版本排查|%v|
-|已分析|5.abi变化|%v|
-
-**请确认分析内容的准确性，确认无误后，您可以进行后续步骤，否则您可以继续分析**
-`
-
 const reOpenComment = `
 @%s
 关闭issue前,需要将受影响的分支在合并pr时关联上当前issue编号: #%v
@@ -121,8 +108,9 @@ const commentVersionTip = `
 `
 
 const (
-	commentCmd  = "https://gitee.com/Coopermassaki/cve-manager/blob/master/cve-vulner-manager/doc/md/defect-manager-manual.md"
-	PrIssueLink = "https://gitee.com/help/articles/4142"
+	commentCmd    = "https://gitee.com/Coopermassaki/cve-manager/blob/master/cve-vulner-manager/doc/md/defect-manager-manual.md"
+	PrIssueLink   = "https://gitee.com/help/articles/4142"
+	NameSpacePath = "src-openeuler"
 )
 
 // When issue created, add issue body part 2 defect analysis structurecontent
@@ -189,7 +177,7 @@ func analysisComplete(assigner *sdk.UserHook, anlysisComment parseCommentResult)
 	)
 }
 
-func modifyIssueBodyStyle(labels []sdk.LabelHook, name string) sdk.IssueUpdateParam {
+func modifyIssueLabels(labels []sdk.LabelHook, name string) sdk.IssueUpdateParam {
 	newLabels := dealLabels(labels, unFixedLabel)
 
 	return sdk.IssueUpdateParam{

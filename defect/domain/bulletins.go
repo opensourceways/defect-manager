@@ -5,12 +5,12 @@ import (
 )
 
 type SecurityBulletin struct {
-	AffectedVersion []dp.SystemVersion
-	Identification  string
-	Date            string
-	Component       string
-	ProductTree     ProductTree
-	Defects         Defects
+	UnPublishedVersion []dp.SystemVersion
+	Identification     string
+	Date               string
+	Component          string
+	ProductTree        ProductTree
+	Defects            Defects
 }
 
 type ProductTree = map[dp.Arch][]Product

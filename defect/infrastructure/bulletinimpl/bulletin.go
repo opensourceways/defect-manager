@@ -46,7 +46,7 @@ func (impl bulletinImpl) Generate(sb *domain.SecurityBulletin) ([]byte, error) {
 
 func (impl bulletinImpl) joinVersion(sb *domain.SecurityBulletin) string {
 	var title string
-	for _, v := range sb.AffectedVersion {
+	for _, v := range sb.UnPublishedVersion {
 		title += v.String() + ","
 	}
 
@@ -99,7 +99,7 @@ func (impl bulletinImpl) documentNotes(sb *domain.SecurityBulletin) DocumentNote
 	var highestLevelIndex int
 
 	for _, defect := range sb.Defects {
-		description += fmt.Sprintf("%s(%s)\r\n\r\n", defect.Description, impl.bugID(defect.Issue.Number))
+		description += fmt.Sprintf("%s(%s)\r\n\r\n", defect.Influence, impl.bugID(defect.Issue.Number))
 		// Choose the highest security level in defects, as security level in bulletin
 		for k, v := range dp.SequenceSeverityLevel {
 			if v == defect.SeverityLevel.String() && k > highestLevelIndex {
@@ -156,15 +156,19 @@ func (impl bulletinImpl) documentReferences(sb *domain.SecurityBulletin) Documen
 		},
 	}
 
-	var defectUrl []CveUrl
+	var defectUrl, referenceUrl []CveUrl
 	for _, defect := range sb.Defects {
 		url := fmt.Sprintf("https://gitee.com/%s/%s/issues/%s",
 			defect.Issue.Org, defect.Issue.Repo, defect.Issue.Number,
 		)
 		defectUrl = append(defectUrl, CveUrl{Url: url})
+
+		if defect.ReferenceURL.URL() != "" {
+			referenceUrl = append(referenceUrl, CveUrl{Url: defect.ReferenceURL.URL()})
+		}
 	}
 
-	return DocumentReferences{
+	df := DocumentReferences{
 		CveReference: []CveReference{
 			{
 				Type:   "Self",
@@ -176,6 +180,15 @@ func (impl bulletinImpl) documentReferences(sb *domain.SecurityBulletin) Documen
 			},
 		},
 	}
+
+	if len(referenceUrl) > 0 {
+		df.CveReference = append(df.CveReference, CveReference{
+			Type:   "other",
+			CveUrl: referenceUrl,
+		})
+	}
+
+	return df
 }
 
 func (impl bulletinImpl) productTree(sb *domain.SecurityBulletin) ProductTree {
@@ -185,7 +198,7 @@ func (impl bulletinImpl) productTree(sb *domain.SecurityBulletin) ProductTree {
 	}
 
 	var productOfVersion []FullProductName
-	for _, v := range sb.AffectedVersion {
+	for _, v := range sb.UnPublishedVersion {
 		productOfVersion = append(productOfVersion, FullProductName{
 			ProductId:       v.String(),
 			Cpe:             getCpe(v.String()),
@@ -233,7 +246,7 @@ func (impl bulletinImpl) vulnerability(sb *domain.SecurityBulletin) []Vulnerabil
 
 	for k, defect := range sb.Defects {
 		var idOfStatus []ProductId
-		for _, v := range sb.AffectedVersion {
+		for _, v := range sb.UnPublishedVersion {
 			idOfStatus = append(idOfStatus, ProductId{
 				ProductId: v.String(),
 			})
