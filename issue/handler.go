@@ -439,10 +439,20 @@ func (impl eventHandler) checkRelatedPR(e *sdk.IssueEvent, versions []string) (r
 		return nil, nil
 	}
 
+	var maintainVersionSets = sets.NewString()
+	for _, v := range impl.cfg.MaintainVersion {
+		maintainVersionSets.Insert(v)
+	}
+
 	mergeVersionSets := sets.NewString()
 	for _, pr := range prs {
 		// 过滤掉不是src-openeuler组织下的PR
 		if pr.Base.Repo.Namespace.Path != NameSpacePath {
+			continue
+		}
+
+		// 过滤掉不是在维版本的PR
+		if !maintainVersionSets.Has(pr.Base.Ref) {
 			continue
 		}
 
