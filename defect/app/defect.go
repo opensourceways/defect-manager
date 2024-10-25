@@ -79,6 +79,9 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 	var versionForDefects domain.Defects
 	for _, d := range defects {
 		for _, av := range d.FixedVersion {
+			if av == nil {
+				continue
+			}
 			logrus.Infof("FixedVersion is %v, av: %v", d.FixedVersion, av)
 			if av.String() == version {
 				versionForDefects = append(versionForDefects, d)
