@@ -79,10 +79,6 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 	var versionForDefects domain.Defects
 	for _, d := range defects {
 		for _, av := range d.FixedVersion {
-			if av == nil {
-				continue
-			}
-			logrus.Infof("FixedVersion is %v, av: %v", d.FixedVersion, av)
 			if av.String() == version {
 				versionForDefects = append(versionForDefects, d)
 			}
@@ -92,6 +88,7 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 	d.productTree.InitCache()
 	defer d.productTree.CleanCache()
 
+	logrus.Info("productTree cache init done")
 	var rpmForDefects domain.Defects
 	instance := producttreeimpl.Instance()
 	for _, vdf := range versionForDefects {
@@ -101,6 +98,7 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 		}
 	}
 
+	logrus.Infof("collect rpmForDefects are : %v", rpmForDefects)
 	issuesNumAndVersions, err := d.backend.PublishedDefects()
 	if err != nil {
 		logrus.Errorf("get published defect error: %s", err.Error())
@@ -112,6 +110,7 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 		issueMap[issue.IssueNum] = append(issueMap[issue.IssueNum], issue.Versions...)
 	}
 
+	logrus.Infof("collect issueMap are : %v", issueMap)
 	var unpublishedDefects domain.Defects
 	for _, rfd := range rpmForDefects {
 		if _, ok := issueMap[rfd.Issue.Number]; !ok {
