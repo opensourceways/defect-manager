@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"runtime"
 	"strings"
 	"time"
 
@@ -88,6 +89,10 @@ func RemoveDuplicates(strSlice []string) []string {
 
 func Catchs() {
 	if err := recover(); err != nil {
-		logrus.Errorf("The program is abnormal, err: %s", err)
+		pc := make([]uintptr, 15) // 调用栈深度
+		n := runtime.Callers(2, pc)
+		frames := runtime.CallersFrames(pc[:n])
+		frame, _ := frames.Next()
+		logrus.Errorf("The program is abnormal. Error: %v\nFile: %s\nLine: %d\nFunction: %s", err, frame.File, frame.Line, frame.Function)
 	}
 }
