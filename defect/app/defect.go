@@ -92,7 +92,7 @@ func (d defectService) CollectDefects(version string) (dto []CollectDefectsDTO, 
 	var rpmForDefects domain.Defects
 	instance := producttreeimpl.Instance()
 	for _, vdf := range versionForDefects {
-		rpmOfComponent := instance.ParseRPM(vdf.UpdatedAt, vdf.Component, version)
+		rpmOfComponent := instance.ParseRPM(vdf.CreatedAt, vdf.Component, version)
 		if rpmOfComponent != "" {
 			rpmForDefects = append(rpmForDefects, vdf)
 		}
