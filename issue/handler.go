@@ -462,6 +462,10 @@ func (impl eventHandler) checkRelatedPR(e *sdk.IssueEvent, versions []string) (r
 	}
 
 	for _, v := range versions {
+		if !maintainVersionSets.Has(v) {
+			continue
+		}
+
 		if !mergeVersionSets.Has(v) {
 			relatedPRNotMerged = append(relatedPRNotMerged, v)
 		}
